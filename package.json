@@ -1,4 +1,12 @@
 {
+  "name": "libretyhub-tg-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for MP3 conversion and social video downloads.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "check": "node --check index.js"
+  },
   "dependencies": {
     "telegraf": "^4.16.3"
   }
