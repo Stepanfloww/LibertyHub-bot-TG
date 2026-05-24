@@ -15,13 +15,14 @@ if (!token) {
   process.exit(1);
 }
 
-const bot = new Telegraf(token);
-const userState = new Map();
-const maxOutputBytes = Number(process.env.MAX_OUTPUT_MB || 45) * 1024 * 1024;
-
 const rootDir = __dirname;
 const tmpDir = path.join(rootDir, 'tmp');
 const downloadsDir = path.join(rootDir, 'downloads');
+const usersFile = path.join(rootDir, 'users.json');
+
+const bot = new Telegraf(token);
+const userState = loadUserStore();
+const maxOutputBytes = Number(process.env.MAX_OUTPUT_MB || 45) * 1024 * 1024;
 
 const languages = {
   ru: {
@@ -41,6 +42,13 @@ const languages = {
     tooLarge: '\u0424\u0430\u0439\u043b \u043f\u043e\u043b\u0443\u0447\u0438\u043b\u0441\u044f \u0441\u043b\u0438\u0448\u043a\u043e\u043c \u0431\u043e\u043b\u044c\u0448\u0438\u043c \u0434\u043b\u044f \u043e\u0442\u043f\u0440\u0430\u0432\u043a\u0438 \u0447\u0435\u0440\u0435\u0437 Telegram.',
     toolMissing: '\u041d\u0430 \u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440\u0435 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u043e: {tool}. \u0423\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u0435 \u0435\u0433\u043e \u0438 \u0434\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u0432 PATH.',
     failed: '\u041d\u0435 \u043f\u043e\u043b\u0443\u0447\u0438\u043b\u043e\u0441\u044c \u0432\u044b\u043f\u043e\u043b\u043d\u0438\u0442\u044c \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u044e. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0444\u0430\u0439\u043b/\u0441\u0441\u044b\u043b\u043a\u0443 \u0438 \u0443\u0442\u0438\u043b\u0438\u0442\u044b.',
+    mainMenu: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435:',
+    convertMenu: '\u041f\u0440\u0438\u0448\u043b\u0438\u0442\u0435 MP3 \u0438\u043b\u0438 MOV-\u0444\u0430\u0439\u043b.',
+    downloadMenu: '\u041f\u0440\u0438\u0448\u043b\u0438\u0442\u0435 \u0441\u0441\u044b\u043b\u043a\u0443 Instagram, YouTube \u0438\u043b\u0438 TikTok.',
+    convertFilesButton: '\uD83D\uDCE6 \u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0430\u0446\u0438\u044F \u0444\u0430\u0439\u043B\u043E\u0432',
+    downloadVideoButton: '\u26A1 \u0421\u043A\u0430\u0447\u0430\u0442\u044C \u0432\u0438\u0434\u0435\u043E',
+    backButton: '\u2B05 \u041D\u0430\u0437\u0430\u0434',
+    chooseFromMenu: '\u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0440\u0430\u0437\u0434\u0435\u043B \u0432 \u043C\u0435\u043D\u044E.',
     commands: '\u041a\u043e\u043c\u0430\u043d\u0434\u044b: /start, /language, /help'
   },
   en: {
@@ -60,6 +68,13 @@ const languages = {
     tooLarge: 'The output file is too large to send through Telegram.',
     toolMissing: 'Missing tool on this computer: {tool}. Install it and add it to PATH.',
     failed: 'The operation failed. Check the file/link and tools.',
+    mainMenu: 'Choose an action:',
+    convertMenu: 'Send an MP3 or MOV file.',
+    downloadMenu: 'Send an Instagram, YouTube, or TikTok link.',
+    convertFilesButton: '\uD83D\uDCE6 Convert files',
+    downloadVideoButton: '\u26A1 Download video',
+    backButton: '\u2B05 Back',
+    chooseFromMenu: 'Choose a section from the menu first.',
     commands: 'Commands: /start, /language, /help'
   },
   de: {
@@ -79,6 +94,13 @@ const languages = {
     tooLarge: 'Die Ausgabedatei ist zu gro\u00df f\u00fcr Telegram.',
     toolMissing: 'Fehlendes Programm auf diesem Computer: {tool}. Installiere es und f\u00fcge es zu PATH hinzu.',
     failed: 'Der Vorgang ist fehlgeschlagen. Pr\u00fcfe Datei/Link und Programme.',
+    mainMenu: 'Aktion ausw\u00e4hlen:',
+    convertMenu: 'Sende eine MP3- oder MOV-Datei.',
+    downloadMenu: 'Sende einen Instagram-, YouTube- oder TikTok-Link.',
+    convertFilesButton: '\uD83D\uDCE6 Dateien konvertieren',
+    downloadVideoButton: '\u26A1 Video herunterladen',
+    backButton: '\u2B05 Zur\u00fcck',
+    chooseFromMenu: 'W\u00e4hle zuerst einen Bereich im Men\u00fc.',
     commands: 'Befehle: /start, /language, /help'
   }
 };
@@ -101,6 +123,39 @@ function loadEnv() {
   }
 }
 
+function loadUserStore() {
+  if (!fs.existsSync(usersFile)) return new Map();
+
+  try {
+    const raw = fs.readFileSync(usersFile, 'utf8');
+    const parsed = JSON.parse(raw);
+    return new Map(Object.entries(parsed));
+  } catch (error) {
+    console.error('Could not read users.json:', error);
+    return new Map();
+  }
+}
+
+function saveUserStore() {
+  const data = {};
+  for (const [userId, state] of userState.entries()) {
+    data[userId] = {
+      lang: state.lang || 'ru',
+      mode: state.mode || 'menu'
+    };
+  }
+
+  fs.writeFileSync(usersFile, JSON.stringify(data, null, 2));
+}
+
+function updateUserState(userId, patch) {
+  const current = userState.get(userId) || {};
+  const next = { ...current, ...patch };
+  userState.set(userId, next);
+  saveUserStore();
+  return next;
+}
+
 function t(ctx, key, values = {}) {
   const lang = getLang(ctx);
   let text = languages[lang][key] || languages.en[key] || key;
@@ -114,9 +169,20 @@ function getLang(ctx) {
   return userState.get(ctx.from?.id)?.lang || 'ru';
 }
 
+function hasLang(userId) {
+  return Boolean(userState.get(userId)?.lang);
+}
+
 function setLang(userId, lang) {
-  const current = userState.get(userId) || {};
-  userState.set(userId, { ...current, lang });
+  updateUserState(userId, { lang, mode: 'menu' });
+}
+
+function setMode(userId, mode) {
+  updateUserState(userId, { mode });
+}
+
+function getMode(userId) {
+  return userState.get(userId)?.mode || 'menu';
 }
 
 function setPendingAudio(userId, filePath) {
@@ -136,10 +202,24 @@ function languageKeyboard() {
   ]);
 }
 
-function formatKeyboard() {
+function mainMenuKeyboard(ctx) {
   return Markup.inlineKeyboard([
-    Markup.button.callback('MP4', 'convert:mp4'),
-    Markup.button.callback('MOV', 'convert:mov')
+    [Markup.button.callback(t(ctx, 'convertFilesButton'), 'menu:convert')],
+    [Markup.button.callback(t(ctx, 'downloadVideoButton'), 'menu:download')]
+  ]);
+}
+
+function backKeyboard(ctx) {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback(t(ctx, 'backButton'), 'menu:back')]
+  ]);
+}
+
+function formatKeyboard(ctx) {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback('MP4', 'convert:mp4')],
+    [Markup.button.callback('MOV', 'convert:mov')],
+    [Markup.button.callback(t(ctx, 'backButton'), 'menu:back')]
   ]);
 }
 
@@ -326,6 +406,25 @@ async function cleanup(filePaths) {
   )));
 }
 
+async function deleteMessageSafe(ctx, message) {
+  if (!message?.message_id) return;
+
+  await ctx.telegram.deleteMessage(ctx.chat.id, message.message_id).catch(() => {});
+}
+
+async function showMainMenu(ctx, edit = false) {
+  setMode(ctx.from.id, 'menu');
+  const text = t(ctx, 'mainMenu');
+  const keyboard = mainMenuKeyboard(ctx);
+
+  if (edit) {
+    await ctx.editMessageText(text, keyboard).catch(() => ctx.reply(text, keyboard));
+    return;
+  }
+
+  await ctx.reply(text, keyboard);
+}
+
 async function downloadTelegramFile(ctx, telegramFile, fallbackExtension) {
   await ensureDirs();
   const input = path.join(
@@ -348,7 +447,12 @@ async function sendConvertedFile(ctx, filePath, format) {
 }
 
 bot.start(async (ctx) => {
-  await ctx.reply(languages.ru.chooseLanguage, languageKeyboard());
+  if (!hasLang(ctx.from.id)) {
+    await ctx.reply(languages.ru.chooseLanguage, languageKeyboard());
+    return;
+  }
+
+  await showMainMenu(ctx);
 });
 
 bot.command('language', async (ctx) => {
@@ -356,15 +460,33 @@ bot.command('language', async (ctx) => {
 });
 
 bot.help(async (ctx) => {
-  await ctx.reply(`${t(ctx, 'help')}\n\n${t(ctx, 'commands')}`);
+  await showMainMenu(ctx);
 });
 
 bot.action(/^lang:(ru|en|de)$/, async (ctx) => {
   const lang = ctx.match[1];
   setLang(ctx.from.id, lang);
   await ctx.answerCbQuery(languages[lang].name);
-  await ctx.editMessageText(languages[lang].languageSaved);
-  await ctx.reply(`${languages[lang].start}\n\n${languages[lang].help}`);
+  await ctx.editMessageText(languages[lang].mainMenu, mainMenuKeyboard(ctx));
+});
+
+bot.action('menu:convert', async (ctx) => {
+  setMode(ctx.from.id, 'convert');
+  await ctx.answerCbQuery();
+  await ctx.editMessageText(t(ctx, 'convertMenu'), backKeyboard(ctx));
+});
+
+bot.action('menu:download', async (ctx) => {
+  setMode(ctx.from.id, 'download');
+  await ctx.answerCbQuery();
+  await ctx.editMessageText(t(ctx, 'downloadMenu'), backKeyboard(ctx));
+});
+
+bot.action('menu:back', async (ctx) => {
+  await cleanup([getPendingAudio(ctx.from.id)]);
+  setPendingAudio(ctx.from.id, undefined);
+  await ctx.answerCbQuery();
+  await showMainMenu(ctx, true);
 });
 
 bot.action(/^convert:(mp4|mov)$/, async (ctx) => {
@@ -379,44 +501,57 @@ bot.action(/^convert:(mp4|mov)$/, async (ctx) => {
   await ctx.answerCbQuery(format.toUpperCase());
   if (!(await requireTool(ctx, 'ffmpeg'))) return;
 
-  await ctx.reply(t(ctx, 'converting', { format: format.toUpperCase() }));
-
   const output = path.join(downloadsDir, `${Date.now()}-${crypto.randomUUID()}.${format}`);
+  let statusMessage;
   try {
+    statusMessage = await ctx.reply(t(ctx, 'converting', { format: format.toUpperCase() }));
     await convertMp3ToVideo(input, output, format);
     if (await assertSendable(ctx, output)) {
       await sendConvertedFile(ctx, output, format);
     }
+    await deleteMessageSafe(ctx, statusMessage);
   } catch (error) {
     console.error(error);
     await ctx.reply(t(ctx, 'failed'));
   } finally {
+    await deleteMessageSafe(ctx, statusMessage);
     await cleanup([input, output]);
     setPendingAudio(ctx.from.id, undefined);
   }
 });
 
 bot.on(['audio', 'document', 'video'], async (ctx) => {
+  if (!hasLang(ctx.from.id)) {
+    await ctx.reply(languages.ru.chooseLanguage, languageKeyboard());
+    return;
+  }
+
+  if (getMode(ctx.from.id) !== 'convert') {
+    await ctx.reply(t(ctx, 'chooseFromMenu'), mainMenuKeyboard(ctx));
+    return;
+  }
+
   const telegramFile = getMessageFile(ctx.message);
   const kind = telegramFile ? getMediaKind(telegramFile) : null;
 
   if (!kind) {
-    await ctx.reply(t(ctx, 'sendSupported'));
+    await ctx.reply(t(ctx, 'sendSupported'), backKeyboard(ctx));
     return;
   }
 
   if (kind === 'mp3') {
-    await ctx.reply(t(ctx, 'downloadingFile'));
+    const statusMessage = await ctx.reply(t(ctx, 'downloadingFile'));
     const input = await downloadTelegramFile(ctx, telegramFile, '.mp3').catch(async (error) => {
       console.error(error);
       await ctx.reply(t(ctx, 'failed'));
       return null;
     });
+    await deleteMessageSafe(ctx, statusMessage);
     if (!input) return;
 
     await cleanup([getPendingAudio(ctx.from.id)]);
     setPendingAudio(ctx.from.id, input);
-    await ctx.reply(t(ctx, 'chooseFormat'), formatKeyboard());
+    await ctx.reply(t(ctx, 'chooseFormat'), formatKeyboard(ctx));
     return;
   }
 
@@ -424,41 +559,60 @@ bot.on(['audio', 'document', 'video'], async (ctx) => {
 
   let input;
   const output = path.join(downloadsDir, `${Date.now()}-${crypto.randomUUID()}.mp4`);
+  let statusMessage;
   try {
-    await ctx.reply(t(ctx, 'downloadingFile'));
+    statusMessage = await ctx.reply(t(ctx, 'downloadingFile'));
     input = await downloadTelegramFile(ctx, telegramFile, '.mov');
-    await ctx.reply(t(ctx, 'converting', { format: 'MP4' }));
+    await ctx.telegram.editMessageText(
+      ctx.chat.id,
+      statusMessage.message_id,
+      undefined,
+      t(ctx, 'converting', { format: 'MP4' })
+    ).catch(() => {});
     await convertMovToMp4(input, output);
     if (await assertSendable(ctx, output)) {
       await sendConvertedFile(ctx, output, 'mp4');
     }
+    await deleteMessageSafe(ctx, statusMessage);
   } catch (error) {
     console.error(error);
     await ctx.reply(t(ctx, 'failed'));
   } finally {
+    await deleteMessageSafe(ctx, statusMessage);
     await cleanup([input, output]);
   }
 });
 
 bot.on('text', async (ctx) => {
+  if (!hasLang(ctx.from.id)) {
+    await ctx.reply(languages.ru.chooseLanguage, languageKeyboard());
+    return;
+  }
+
+  if (getMode(ctx.from.id) !== 'download') {
+    await ctx.reply(t(ctx, 'chooseFromMenu'), mainMenuKeyboard(ctx));
+    return;
+  }
+
   const text = ctx.message.text.trim();
   if (!isSupportedVideoUrl(text)) {
-    await ctx.reply(t(ctx, 'unsupportedLink'));
+    await ctx.reply(t(ctx, 'unsupportedLink'), backKeyboard(ctx));
     return;
   }
 
   if (!(await requireTool(ctx, 'yt-dlp'))) return;
 
   await ensureDirs();
-  await ctx.reply(t(ctx, 'downloadingVideo'));
+  const statusMessage = await ctx.reply(t(ctx, 'downloadingVideo'));
 
   const id = `${Date.now()}-${crypto.randomUUID()}`;
   const outputTemplate = path.join(downloadsDir, `${id}.%(ext)s`);
 
+  let downloaded;
   try {
     await downloadSocialVideo(text, outputTemplate);
     const files = await fsp.readdir(downloadsDir);
-    const downloaded = files
+    downloaded = files
       .filter((file) => file.startsWith(id))
       .map((file) => path.join(downloadsDir, file))[0];
 
@@ -467,10 +621,14 @@ bot.on('text', async (ctx) => {
     if (await assertSendable(ctx, downloaded)) {
       await ctx.replyWithVideo({ source: downloaded }, { caption: path.basename(downloaded) });
     }
+    await deleteMessageSafe(ctx, statusMessage);
     await cleanup([downloaded]);
   } catch (error) {
     console.error(error);
     await ctx.reply(t(ctx, 'failed'));
+  } finally {
+    await deleteMessageSafe(ctx, statusMessage);
+    await cleanup([downloaded]);
   }
 });
 
