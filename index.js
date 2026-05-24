@@ -24,19 +24,53 @@ const bot = new Telegraf(token);
 const userState = loadUserStore();
 const maxOutputBytes = Number(process.env.MAX_OUTPUT_MB || 45) * 1024 * 1024;
 
+const platforms = {
+  instagram: {
+    label: 'Instagram',
+    hosts: ['instagram.com']
+  },
+  youtube: {
+    label: 'YouTube',
+    hosts: ['youtube.com', 'youtu.be', 'm.youtube.com']
+  },
+  tiktok: {
+    label: 'TikTok',
+    hosts: ['tiktok.com', 'vm.tiktok.com', 'vt.tiktok.com']
+  },
+  vk: {
+    label: 'VK Video',
+    hosts: ['vk.com', 'm.vk.com', 'video.vk.com', 'vkvideo.ru', 'vk.ru']
+  },
+  rutube: {
+    label: 'Rutube',
+    hosts: ['rutube.ru']
+  }
+};
+
+const qualities = [
+  { id: '144', label: '144p', height: 144 },
+  { id: '240', label: '240p', height: 240 },
+  { id: '360', label: '360p', height: 360 },
+  { id: '480', label: '480p', height: 480 },
+  { id: '720', label: '720p', height: 720 },
+  { id: '1080', label: '1080p', height: 1080 },
+  { id: '1440', label: '2K', height: 1440 },
+  { id: '2160', label: '4K', height: 2160 }
+];
+
 const languages = {
   ru: {
     name: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439',
     chooseLanguage: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u044f\u0437\u044b\u043a:',
-    languageSaved: '\u042f\u0437\u044b\u043a \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d. \u041e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 MP3, MOV \u0438\u043b\u0438 \u0441\u0441\u044b\u043b\u043a\u0443 Instagram, YouTube, TikTok.',
-    start: '\u041f\u0440\u0438\u0432\u0435\u0442! \u042f \u043a\u043e\u043d\u0432\u0435\u0440\u0442\u0438\u0440\u0443\u044e MP3 \u0432 MP4/MOV, MOV \u0432 MP4 \u0438 \u0441\u043a\u0430\u0447\u0438\u0432\u0430\u044e \u0432\u0438\u0434\u0435\u043e \u043f\u043e \u0441\u0441\u044b\u043b\u043a\u0430\u043c Instagram, YouTube, TikTok.',
+    languageSaved: '\u042f\u0437\u044b\u043a \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d. \u041e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 MP3, MOV \u0438\u043b\u0438 \u0441\u0441\u044b\u043b\u043a\u0443 Instagram, YouTube, TikTok, VK Video, Rutube.',
+    start: '\u041f\u0440\u0438\u0432\u0435\u0442! \u042f \u043a\u043e\u043d\u0432\u0435\u0440\u0442\u0438\u0440\u0443\u044e MP3 \u0432 MP4/MOV, MOV \u0432 MP4 \u0438 \u0441\u043a\u0430\u0447\u0438\u0432\u0430\u044e \u0432\u0438\u0434\u0435\u043e \u043f\u043e \u0441\u0441\u044b\u043b\u043a\u0430\u043c Instagram, YouTube, TikTok, VK Video, Rutube.',
     help: '\u041e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 MP3 \u043a\u0430\u043a \u0430\u0443\u0434\u0438\u043e \u0438\u043b\u0438 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442, \u0437\u0430\u0442\u0435\u043c \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 MP4 \u0438\u043b\u0438 MOV. MOV-\u0444\u0430\u0439\u043b \u044f \u0441\u0440\u0430\u0437\u0443 \u043a\u043e\u043d\u0432\u0435\u0440\u0442\u0438\u0440\u0443\u044e \u0432 MP4. \u0422\u0430\u043a\u0436\u0435 \u043c\u043e\u0436\u043d\u043e \u043f\u0440\u0438\u0441\u043b\u0430\u0442\u044c \u0441\u0441\u044b\u043b\u043a\u0443 \u043d\u0430 \u0432\u0438\u0434\u0435\u043e.',
     chooseFormat: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u043e\u0440\u043c\u0430\u0442 \u043a\u043e\u043d\u0432\u0435\u0440\u0442\u0430\u0446\u0438\u0438:',
     downloadingFile: '\u0421\u043a\u0430\u0447\u0438\u0432\u0430\u044e \u0444\u0430\u0439\u043b...',
     converting: '\u041a\u043e\u043d\u0432\u0435\u0440\u0442\u0438\u0440\u0443\u044e \u0432 {format}...',
     converted: '\u0413\u043e\u0442\u043e\u0432\u043e: {file}',
     downloadingVideo: '\u0421\u043a\u0430\u0447\u0438\u0432\u0430\u044e \u0432\u0438\u0434\u0435\u043e...',
-    unsupportedLink: '\u041f\u043e\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u044e\u0442\u0441\u044f \u0441\u0441\u044b\u043b\u043a\u0438 Instagram, YouTube \u0438 TikTok.',
+    unsupportedLink: '\u041f\u043e\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u044e\u0442\u0441\u044f \u0441\u0441\u044b\u043b\u043a\u0438 Instagram, YouTube, TikTok, VK Video \u0438 Rutube.',
     sendSupported: '\u041e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 MP3, MOV \u0438\u043b\u0438 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u043c\u0443\u044e \u0441\u0441\u044b\u043b\u043a\u0443.',
     noPendingFile: '\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u043e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 MP3-\u0444\u0430\u0439\u043b.',
     tooLarge: '\u0424\u0430\u0439\u043b \u043f\u043e\u043b\u0443\u0447\u0438\u043b\u0441\u044f \u0441\u043b\u0438\u0448\u043a\u043e\u043c \u0431\u043e\u043b\u044c\u0448\u0438\u043c \u0434\u043b\u044f \u043e\u0442\u043f\u0440\u0430\u0432\u043a\u0438 \u0447\u0435\u0440\u0435\u0437 Telegram.',
@@ -44,7 +78,12 @@ const languages = {
     failed: '\u041d\u0435 \u043f\u043e\u043b\u0443\u0447\u0438\u043b\u043e\u0441\u044c \u0432\u044b\u043f\u043e\u043b\u043d\u0438\u0442\u044c \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u044e. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0444\u0430\u0439\u043b/\u0441\u0441\u044b\u043b\u043a\u0443 \u0438 \u0443\u0442\u0438\u043b\u0438\u0442\u044b.',
     mainMenu: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435:',
     convertMenu: '\u041f\u0440\u0438\u0448\u043b\u0438\u0442\u0435 MP3 \u0438\u043b\u0438 MOV-\u0444\u0430\u0439\u043b.',
-    downloadMenu: '\u041f\u0440\u0438\u0448\u043b\u0438\u0442\u0435 \u0441\u0441\u044b\u043b\u043a\u0443 Instagram, YouTube \u0438\u043b\u0438 TikTok.',
+    downloadMenu: 'Выберите платформу:',
+    platformChosen: 'Пришлите ссылку {platform}.',
+    wrongPlatform: 'Эта ссылка не похожа на {platform}. Выберите правильную платформу или пришлите подходящую ссылку.',
+    chooseQuality: 'Выберите качество:',
+    qualityChosen: 'Скачиваю {quality}...',
+    compressingVideo: 'Файл больше лимита Telegram. Сжимаю видео, чтобы отправить его клиенту...',
     convertFilesButton: '\uD83D\uDCE6 \u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0430\u0446\u0438\u044F \u0444\u0430\u0439\u043B\u043E\u0432',
     downloadVideoButton: '\u26A1 \u0421\u043A\u0430\u0447\u0430\u0442\u044C \u0432\u0438\u0434\u0435\u043E',
     backButton: '\u2B05 \u041D\u0430\u0437\u0430\u0434',
@@ -54,15 +93,15 @@ const languages = {
   en: {
     name: 'English',
     chooseLanguage: 'Choose a language:',
-    languageSaved: 'Language saved. Send an MP3, MOV, or an Instagram, YouTube, TikTok link.',
-    start: 'Hi! I convert MP3 to MP4/MOV, MOV to MP4, and download videos from Instagram, YouTube, and TikTok links.',
+    languageSaved: 'Language saved. Send an MP3, MOV, or an Instagram, YouTube, TikTok, VK Video, Rutube link.',
+    start: 'Hi! I convert MP3 to MP4/MOV, MOV to MP4, and download videos from Instagram, YouTube, TikTok, VK Video, and Rutube links.',
     help: 'Send an MP3 as audio or document, then choose MP4 or MOV. Send a MOV file and I will convert it to MP4. You can also send a video link.',
     chooseFormat: 'Choose conversion format:',
     downloadingFile: 'Downloading file...',
     converting: 'Converting to {format}...',
     converted: 'Done: {file}',
     downloadingVideo: 'Downloading video...',
-    unsupportedLink: 'Only Instagram, YouTube, and TikTok links are supported.',
+    unsupportedLink: 'Only Instagram, YouTube, TikTok, VK Video, and Rutube links are supported.',
     sendSupported: 'Send an MP3, MOV, or a supported link.',
     noPendingFile: 'Please send an MP3 file first.',
     tooLarge: 'The output file is too large to send through Telegram.',
@@ -70,7 +109,12 @@ const languages = {
     failed: 'The operation failed. Check the file/link and tools.',
     mainMenu: 'Choose an action:',
     convertMenu: 'Send an MP3 or MOV file.',
-    downloadMenu: 'Send an Instagram, YouTube, or TikTok link.',
+    downloadMenu: 'Choose a platform:',
+    platformChosen: 'Send a {platform} link.',
+    wrongPlatform: 'This link does not look like {platform}. Choose the right platform or send a matching link.',
+    chooseQuality: 'Choose quality:',
+    qualityChosen: 'Downloading {quality}...',
+    compressingVideo: 'The file is above the Telegram limit. Compressing it so it can be sent...',
     convertFilesButton: '\uD83D\uDCE6 Convert files',
     downloadVideoButton: '\u26A1 Download video',
     backButton: '\u2B05 Back',
@@ -80,15 +124,15 @@ const languages = {
   de: {
     name: 'Deutsch',
     chooseLanguage: 'Sprache ausw\u00e4hlen:',
-    languageSaved: 'Sprache gespeichert. Sende eine MP3, MOV oder einen Instagram-, YouTube-, TikTok-Link.',
-    start: 'Hallo! Ich konvertiere MP3 zu MP4/MOV, MOV zu MP4 und lade Videos von Instagram-, YouTube- und TikTok-Links herunter.',
+    languageSaved: 'Sprache gespeichert. Sende eine MP3, MOV oder einen Instagram-, YouTube-, TikTok-, VK-Video- oder Rutube-Link.',
+    start: 'Hallo! Ich konvertiere MP3 zu MP4/MOV, MOV zu MP4 und lade Videos von Instagram, YouTube, TikTok, VK Video und Rutube herunter.',
     help: 'Sende eine MP3 als Audio oder Dokument und w\u00e4hle danach MP4 oder MOV. Eine MOV-Datei konvertiere ich direkt zu MP4. Du kannst auch einen Videolink senden.',
     chooseFormat: 'Zielformat ausw\u00e4hlen:',
     downloadingFile: 'Datei wird heruntergeladen...',
     converting: 'Konvertiere zu {format}...',
     converted: 'Fertig: {file}',
     downloadingVideo: 'Video wird heruntergeladen...',
-    unsupportedLink: 'Es werden nur Instagram-, YouTube- und TikTok-Links unterst\u00fctzt.',
+    unsupportedLink: 'Es werden nur Instagram-, YouTube-, TikTok-, VK-Video- und Rutube-Links unterst\u00fctzt.',
     sendSupported: 'Sende eine MP3, MOV oder einen unterst\u00fctzten Link.',
     noPendingFile: 'Bitte sende zuerst eine MP3-Datei.',
     tooLarge: 'Die Ausgabedatei ist zu gro\u00df f\u00fcr Telegram.',
@@ -96,7 +140,12 @@ const languages = {
     failed: 'Der Vorgang ist fehlgeschlagen. Pr\u00fcfe Datei/Link und Programme.',
     mainMenu: 'Aktion ausw\u00e4hlen:',
     convertMenu: 'Sende eine MP3- oder MOV-Datei.',
-    downloadMenu: 'Sende einen Instagram-, YouTube- oder TikTok-Link.',
+    downloadMenu: 'Plattform ausw\u00e4hlen:',
+    platformChosen: 'Sende einen {platform}-Link.',
+    wrongPlatform: 'Dieser Link sieht nicht wie {platform} aus. W\u00e4hle die richtige Plattform oder sende einen passenden Link.',
+    chooseQuality: 'Qualit\u00e4t ausw\u00e4hlen:',
+    qualityChosen: '{quality} wird heruntergeladen...',
+    compressingVideo: 'Die Datei ist gr\u00f6\u00dfer als das Telegram-Limit. Komprimiere sie zum Senden...',
     convertFilesButton: '\uD83D\uDCE6 Dateien konvertieren',
     downloadVideoButton: '\u26A1 Video herunterladen',
     backButton: '\u2B05 Zur\u00fcck',
@@ -194,6 +243,21 @@ function getPendingAudio(userId) {
   return userState.get(userId)?.pendingAudio;
 }
 
+function setPendingDownload(userId, patch) {
+  const current = userState.get(userId) || { lang: 'ru' };
+  const pendingDownload = { ...(current.pendingDownload || {}), ...patch };
+  userState.set(userId, { ...current, pendingDownload });
+}
+
+function getPendingDownload(userId) {
+  return userState.get(userId)?.pendingDownload;
+}
+
+function clearPendingDownload(userId) {
+  const current = userState.get(userId) || { lang: 'ru' };
+  userState.set(userId, { ...current, pendingDownload: undefined });
+}
+
 function languageKeyboard() {
   return Markup.inlineKeyboard([
     [Markup.button.callback('Deutsch', 'lang:de')],
@@ -223,21 +287,62 @@ function formatKeyboard(ctx) {
   ]);
 }
 
-function isSupportedVideoUrl(text) {
+function platformKeyboard(ctx) {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback(platforms.instagram.label, 'platform:instagram')],
+    [Markup.button.callback(platforms.youtube.label, 'platform:youtube')],
+    [Markup.button.callback(platforms.tiktok.label, 'platform:tiktok')],
+    [
+      Markup.button.callback(platforms.vk.label, 'platform:vk'),
+      Markup.button.callback(platforms.rutube.label, 'platform:rutube')
+    ],
+    [Markup.button.callback(t(ctx, 'backButton'), 'menu:back')]
+  ]);
+}
+
+function qualityKeyboard(ctx) {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('144p', 'quality:144'),
+      Markup.button.callback('240p', 'quality:240'),
+      Markup.button.callback('360p', 'quality:360')
+    ],
+    [
+      Markup.button.callback('480p', 'quality:480'),
+      Markup.button.callback('720p', 'quality:720'),
+      Markup.button.callback('1080p', 'quality:1080')
+    ],
+    [
+      Markup.button.callback('2K', 'quality:1440'),
+      Markup.button.callback('4K', 'quality:2160')
+    ],
+    [Markup.button.callback(t(ctx, 'backButton'), 'menu:back')]
+  ]);
+}
+
+function getPlatformFromUrl(text) {
   try {
     const url = new URL(text.trim());
     const host = url.hostname.replace(/^www\./, '').toLowerCase();
-    return [
-      'instagram.com',
-      'youtube.com',
-      'youtu.be',
-      'tiktok.com',
-      'vm.tiktok.com',
-      'vt.tiktok.com'
-    ].some((domain) => host === domain || host.endsWith(`.${domain}`));
+
+    for (const [platformId, platform] of Object.entries(platforms)) {
+      if (platform.hosts.some((domain) => host === domain || host.endsWith(`.${domain}`))) {
+        return platformId;
+      }
+    }
+
+    return null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+function isSupportedVideoUrl(text) {
+  return Boolean(getPlatformFromUrl(text));
+}
+
+function getQuality(qualityId) {
+  return qualities.find((quality) => quality.id === qualityId);
 }
 
 function getMessageFile(message) {
@@ -333,7 +438,12 @@ async function downloadUrl(url, destination) {
 function runProcess(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { windowsHide: true, ...options });
+    let stdout = '';
     let stderr = '';
+
+    child.stdout?.on('data', (data) => {
+      stdout += data.toString();
+    });
 
     child.stderr?.on('data', (data) => {
       stderr += data.toString();
@@ -342,7 +452,7 @@ function runProcess(command, args, options = {}) {
     child.on('error', reject);
     child.on('close', (code) => {
       if (code === 0) {
-        resolve();
+        resolve({ stdout, stderr });
       } else {
         reject(new Error(`${command} exited with code ${code}: ${stderr}`));
       }
@@ -381,13 +491,63 @@ async function convertMovToMp4(input, output) {
   ]);
 }
 
-async function downloadSocialVideo(url, outputTemplate) {
+function buildFormatSelector(height) {
+  const video = [
+    `bv*[height<=${height}][ext=mp4]+ba[ext=m4a]`,
+    `bv*[height<=${height}]+ba`,
+    `b[height<=${height}][ext=mp4]`,
+    `b[height<=${height}]`,
+    'worst[ext=mp4]',
+    'worst'
+  ];
+
+  return video.join('/');
+}
+
+async function downloadSocialVideo(url, outputTemplate, quality) {
   await runProcess('yt-dlp', [
     '--no-playlist',
     '--merge-output-format', 'mp4',
-    '-f', 'bv*+ba/best',
+    '--recode-video', 'mp4',
+    '-f', buildFormatSelector(quality.height),
     '-o', outputTemplate,
     url
+  ]);
+}
+
+async function getVideoDurationSeconds(filePath) {
+  const result = await runProcess('ffprobe', [
+    '-v', 'error',
+    '-show_entries', 'format=duration',
+    '-of', 'default=noprint_wrappers=1:nokey=1',
+    filePath
+  ]);
+  const duration = Number(result.stdout.trim());
+  return Number.isFinite(duration) && duration > 0 ? duration : null;
+}
+
+async function compressVideoToLimit(input, output, maxBytes, maxHeight) {
+  const duration = await getVideoDurationSeconds(input);
+  const usableBytes = Math.max(1024 * 1024, maxBytes - (512 * 1024));
+  const totalKbps = duration ? Math.floor((usableBytes * 8) / duration / 1000) : 700;
+  const audioKbps = Math.min(128, Math.max(48, Math.floor(totalKbps * 0.18)));
+  const videoKbps = Math.max(180, totalKbps - audioKbps);
+  const scaleFilter = `scale=-2:'min(${maxHeight},ih)':force_original_aspect_ratio=decrease`;
+
+  await runProcess('ffmpeg', [
+    '-y',
+    '-i', input,
+    '-vf', scaleFilter,
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',
+    '-b:v', `${videoKbps}k`,
+    '-maxrate', `${videoKbps}k`,
+    '-bufsize', `${videoKbps * 2}k`,
+    '-c:a', 'aac',
+    '-b:a', `${audioKbps}k`,
+    '-movflags', '+faststart',
+    '-pix_fmt', 'yuv420p',
+    output
   ]);
 }
 
@@ -446,6 +606,45 @@ async function sendConvertedFile(ctx, filePath, format) {
   }
 }
 
+async function sendDownloadedVideo(ctx, filePath, quality, statusMessage) {
+  const stats = await fsp.stat(filePath);
+  let sendPath = filePath;
+  let compressedPath;
+
+  if (stats.size > maxOutputBytes) {
+    if (!(await requireTool(ctx, 'ffmpeg')) || !(await requireTool(ctx, 'ffprobe'))) {
+      await ctx.reply(t(ctx, 'tooLarge'));
+      return;
+    }
+
+    await ctx.telegram.editMessageText(
+      ctx.chat.id,
+      statusMessage.message_id,
+      undefined,
+      t(ctx, 'compressingVideo')
+    ).catch(() => {});
+
+    compressedPath = path.join(downloadsDir, `${Date.now()}-${crypto.randomUUID()}-compressed.mp4`);
+    await compressVideoToLimit(filePath, compressedPath, maxOutputBytes, quality.height);
+
+    if (!(await assertSendable(ctx, compressedPath))) {
+      await cleanup([compressedPath]);
+      return;
+    }
+
+    sendPath = compressedPath;
+  }
+
+  try {
+    await ctx.replyWithVideo(
+      { source: sendPath },
+      { caption: `${quality.label} - ${path.basename(sendPath)}` }
+    );
+  } finally {
+    await cleanup([compressedPath]);
+  }
+}
+
 bot.start(async (ctx) => {
   if (!hasLang(ctx.from.id)) {
     await ctx.reply(languages.ru.chooseLanguage, languageKeyboard());
@@ -478,15 +677,29 @@ bot.action('menu:convert', async (ctx) => {
 
 bot.action('menu:download', async (ctx) => {
   setMode(ctx.from.id, 'download');
+  clearPendingDownload(ctx.from.id);
   await ctx.answerCbQuery();
-  await ctx.editMessageText(t(ctx, 'downloadMenu'), backKeyboard(ctx));
+  await ctx.editMessageText(t(ctx, 'downloadMenu'), platformKeyboard(ctx));
 });
 
 bot.action('menu:back', async (ctx) => {
   await cleanup([getPendingAudio(ctx.from.id)]);
   setPendingAudio(ctx.from.id, undefined);
+  clearPendingDownload(ctx.from.id);
   await ctx.answerCbQuery();
   await showMainMenu(ctx, true);
+});
+
+bot.action(/^platform:(instagram|youtube|tiktok|vk|rutube)$/, async (ctx) => {
+  const platformId = ctx.match[1];
+  const platform = platforms[platformId];
+  setMode(ctx.from.id, 'download_url');
+  setPendingDownload(ctx.from.id, { platform: platformId, url: undefined });
+  await ctx.answerCbQuery(platform.label);
+  await ctx.editMessageText(
+    t(ctx, 'platformChosen', { platform: platform.label }),
+    backKeyboard(ctx)
+  );
 });
 
 bot.action(/^convert:(mp4|mov)$/, async (ctx) => {
@@ -517,6 +730,48 @@ bot.action(/^convert:(mp4|mov)$/, async (ctx) => {
     await deleteMessageSafe(ctx, statusMessage);
     await cleanup([input, output]);
     setPendingAudio(ctx.from.id, undefined);
+  }
+});
+
+bot.action(/^quality:(144|240|360|480|720|1080|1440|2160)$/, async (ctx) => {
+  const quality = getQuality(ctx.match[1]);
+  const pending = getPendingDownload(ctx.from.id);
+  if (!quality || !pending?.url) {
+    await ctx.answerCbQuery();
+    await ctx.reply(t(ctx, 'chooseFromMenu'), mainMenuKeyboard(ctx));
+    return;
+  }
+
+  await ctx.answerCbQuery(quality.label);
+  if (!(await requireTool(ctx, 'yt-dlp'))) return;
+
+  await ensureDirs();
+
+  const id = `${Date.now()}-${crypto.randomUUID()}`;
+  const outputTemplate = path.join(downloadsDir, `${id}.%(ext)s`);
+  let statusMessage;
+  let downloaded;
+
+  try {
+    statusMessage = await ctx.reply(t(ctx, 'qualityChosen', { quality: quality.label }));
+    await downloadSocialVideo(pending.url, outputTemplate, quality);
+    const files = await fsp.readdir(downloadsDir);
+    downloaded = files
+      .filter((file) => file.startsWith(id))
+      .map((file) => path.join(downloadsDir, file))[0];
+
+    if (!downloaded) throw new Error('yt-dlp did not create an output file.');
+
+    await sendDownloadedVideo(ctx, downloaded, quality, statusMessage);
+    await deleteMessageSafe(ctx, statusMessage);
+    clearPendingDownload(ctx.from.id);
+    setMode(ctx.from.id, 'download');
+  } catch (error) {
+    console.error(error);
+    await ctx.reply(t(ctx, 'failed'));
+  } finally {
+    await deleteMessageSafe(ctx, statusMessage);
+    await cleanup([downloaded]);
   }
 });
 
@@ -589,47 +844,34 @@ bot.on('text', async (ctx) => {
     return;
   }
 
-  if (getMode(ctx.from.id) !== 'download') {
+  if (getMode(ctx.from.id) !== 'download_url') {
     await ctx.reply(t(ctx, 'chooseFromMenu'), mainMenuKeyboard(ctx));
     return;
   }
 
   const text = ctx.message.text.trim();
-  if (!isSupportedVideoUrl(text)) {
+  const urlPlatform = getPlatformFromUrl(text);
+  if (!urlPlatform) {
     await ctx.reply(t(ctx, 'unsupportedLink'), backKeyboard(ctx));
     return;
   }
 
-  if (!(await requireTool(ctx, 'yt-dlp'))) return;
-
-  await ensureDirs();
-  const statusMessage = await ctx.reply(t(ctx, 'downloadingVideo'));
-
-  const id = `${Date.now()}-${crypto.randomUUID()}`;
-  const outputTemplate = path.join(downloadsDir, `${id}.%(ext)s`);
-
-  let downloaded;
-  try {
-    await downloadSocialVideo(text, outputTemplate);
-    const files = await fsp.readdir(downloadsDir);
-    downloaded = files
-      .filter((file) => file.startsWith(id))
-      .map((file) => path.join(downloadsDir, file))[0];
-
-    if (!downloaded) throw new Error('yt-dlp did not create an output file.');
-
-    if (await assertSendable(ctx, downloaded)) {
-      await ctx.replyWithVideo({ source: downloaded }, { caption: path.basename(downloaded) });
-    }
-    await deleteMessageSafe(ctx, statusMessage);
-    await cleanup([downloaded]);
-  } catch (error) {
-    console.error(error);
-    await ctx.reply(t(ctx, 'failed'));
-  } finally {
-    await deleteMessageSafe(ctx, statusMessage);
-    await cleanup([downloaded]);
+  const pending = getPendingDownload(ctx.from.id);
+  if (!pending?.platform) {
+    await ctx.reply(t(ctx, 'downloadMenu'), platformKeyboard(ctx));
+    return;
   }
+
+  if (pending.platform !== urlPlatform) {
+    await ctx.reply(
+      t(ctx, 'wrongPlatform', { platform: platforms[pending.platform].label }),
+      platformKeyboard(ctx)
+    );
+    return;
+  }
+
+  setPendingDownload(ctx.from.id, { url: text });
+  await ctx.reply(t(ctx, 'chooseQuality'), qualityKeyboard(ctx));
 });
 
 bot.catch((error, ctx) => {

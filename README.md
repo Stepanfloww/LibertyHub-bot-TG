@@ -4,7 +4,9 @@ Telegram bot that:
 
 - converts uploaded MP3 files to MP4 or MOV with a simple generated video background;
 - converts uploaded MOV files to MP4;
-- downloads videos from Instagram, YouTube, and TikTok links through `yt-dlp`;
+- downloads videos from Instagram, YouTube, TikTok, VK Video, and Rutube links through `yt-dlp`;
+- asks for a platform and quality from 144p to 4K before downloading;
+- compresses oversized downloads through FFmpeg when needed so Telegram can send them;
 - lets each user choose Russian, English, or German on start.
 
 ## Requirements
@@ -12,7 +14,7 @@ Telegram bot that:
 Install these programs and make sure they are available in PATH:
 
 - Node.js 18+
-- FFmpeg: `ffmpeg`
+- FFmpeg: `ffmpeg` and `ffprobe`
 - yt-dlp: `yt-dlp`
 
 ## Setup
@@ -32,4 +34,4 @@ The token should not be committed to git. If a token was posted publicly, revoke
 - Send `/start` to choose a language.
 - Send an MP3 as an audio file or document, then choose MP4 or MOV.
 - Send a MOV file as a document to convert it to MP4.
-- Send a supported video link from Instagram, YouTube, or TikTok.
+- Choose "Download video", choose a platform, send the link, then choose quality from 144p to 4K.
