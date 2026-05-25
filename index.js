@@ -19,6 +19,7 @@ const adminIds = new Set(
   (process.env.ADMIN_IDS || '')
     .split(',')
     .map((id) => id.trim())
+    .filter((id) => /^\d+$/.test(id))
     .filter(Boolean)
 );
 
@@ -185,7 +186,7 @@ function loadUserStore() {
   try {
     const raw = fs.readFileSync(usersFile, 'utf8');
     const parsed = JSON.parse(raw);
-    return new Map(Object.entries(parsed));
+    return new Map(Object.entries(parsed).map(([userId, state]) => [userKey(userId), state]));
   } catch (error) {
     console.error('Could not read users.json:', error);
     return new Map();
@@ -195,7 +196,7 @@ function loadUserStore() {
 function saveUserStore() {
   const data = {};
   for (const [userId, state] of userState.entries()) {
-    data[userId] = {
+    data[userKey(userId)] = {
       lang: state.lang || 'ru',
       mode: state.mode || 'menu'
     };
@@ -204,10 +205,15 @@ function saveUserStore() {
   fs.writeFileSync(usersFile, JSON.stringify(data, null, 2));
 }
 
+function userKey(userId) {
+  return String(userId);
+}
+
 function updateUserState(userId, patch) {
-  const current = userState.get(userId) || {};
+  const key = userKey(userId);
+  const current = userState.get(key) || {};
   const next = { ...current, ...patch };
-  userState.set(userId, next);
+  userState.set(key, next);
   saveUserStore();
   return next;
 }
@@ -222,11 +228,11 @@ function t(ctx, key, values = {}) {
 }
 
 function getLang(ctx) {
-  return userState.get(ctx.from?.id)?.lang || 'ru';
+  return userState.get(userKey(ctx.from?.id))?.lang || 'ru';
 }
 
 function hasLang(userId) {
-  return Boolean(userState.get(userId)?.lang);
+  return Boolean(userState.get(userKey(userId))?.lang);
 }
 
 function setLang(userId, lang) {
@@ -254,31 +260,34 @@ function getBroadcastUserIds(exceptUserId) {
 }
 
 function getMode(userId) {
-  return userState.get(userId)?.mode || 'menu';
+  return userState.get(userKey(userId))?.mode || 'menu';
 }
 
 function setPendingAudio(userId, filePath) {
-  const current = userState.get(userId) || { lang: 'ru' };
-  userState.set(userId, { ...current, pendingAudio: filePath });
+  const key = userKey(userId);
+  const current = userState.get(key) || { lang: 'ru' };
+  userState.set(key, { ...current, pendingAudio: filePath });
 }
 
 function getPendingAudio(userId) {
-  return userState.get(userId)?.pendingAudio;
+  return userState.get(userKey(userId))?.pendingAudio;
 }
 
 function setPendingDownload(userId, patch) {
-  const current = userState.get(userId) || { lang: 'ru' };
+  const key = userKey(userId);
+  const current = userState.get(key) || { lang: 'ru' };
   const pendingDownload = { ...(current.pendingDownload || {}), ...patch };
-  userState.set(userId, { ...current, pendingDownload });
+  userState.set(key, { ...current, pendingDownload });
 }
 
 function getPendingDownload(userId) {
-  return userState.get(userId)?.pendingDownload;
+  return userState.get(userKey(userId))?.pendingDownload;
 }
 
 function clearPendingDownload(userId) {
-  const current = userState.get(userId) || { lang: 'ru' };
-  userState.set(userId, { ...current, pendingDownload: undefined });
+  const key = userKey(userId);
+  const current = userState.get(key) || { lang: 'ru' };
+  userState.set(key, { ...current, pendingDownload: undefined });
 }
 
 function languageKeyboard() {
@@ -692,7 +701,6 @@ bot.command('push', async (ctx) => {
   }
 
   if (!isAdmin(ctx.from.id)) {
-    await ctx.reply('You are not allowed to use this command.');
     return;
   }
 
@@ -942,12 +950,23 @@ bot.catch((error, ctx) => {
 
 async function main() {
   await ensureDirs();
-  await bot.telegram.setMyCommands([
+  const userCommands = [
     { command: 'start', description: 'Start bot / choose language' },
     { command: 'language', description: 'Change language' },
-    { command: 'help', description: 'Show help' },
+    { command: 'help', description: 'Show help' }
+  ];
+  const adminCommands = [
+    ...userCommands,
     { command: 'push', description: 'Admin: send notification' }
-  ]);
+  ];
+
+  await bot.telegram.setMyCommands(userCommands);
+  for (const adminId of adminIds) {
+    await bot.telegram.setMyCommands(adminCommands, {
+      scope: { type: 'chat', chat_id: Number(adminId) }
+    });
+  }
+
   await bot.launch();
   console.log('Bot is running.');
 }
