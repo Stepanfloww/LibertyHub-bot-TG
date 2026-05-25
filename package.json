@@ -9,5 +9,8 @@
   },
   "dependencies": {
     "telegraf": "^4.16.3"
+  },
+  "overrides": {
+    "@telegraf/types": "9.2.1"
   }
 }

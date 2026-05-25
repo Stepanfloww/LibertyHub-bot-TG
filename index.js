@@ -15,6 +15,13 @@ if (!token) {
   process.exit(1);
 }
 
+const adminIds = new Set(
+  (process.env.ADMIN_IDS || '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean)
+);
+
 const rootDir = __dirname;
 const tmpDir = path.join(rootDir, 'tmp');
 const downloadsDir = path.join(rootDir, 'downloads');
@@ -228,6 +235,22 @@ function setLang(userId, lang) {
 
 function setMode(userId, mode) {
   updateUserState(userId, { mode });
+}
+
+function isAdmin(userId) {
+  return adminIds.has(String(userId));
+}
+
+function getPushText(ctx) {
+  const text = ctx.message?.text || '';
+  const command = ctx.message?.entities?.find((entity) => entity.type === 'bot_command' && entity.offset === 0);
+  if (!command) return '';
+  return text.slice(command.length).trim();
+}
+
+function getBroadcastUserIds(exceptUserId) {
+  const except = String(exceptUserId);
+  return [...userState.keys()].filter((userId) => String(userId) !== except);
 }
 
 function getMode(userId) {
@@ -662,6 +685,45 @@ bot.help(async (ctx) => {
   await showMainMenu(ctx);
 });
 
+bot.command('push', async (ctx) => {
+  if (!adminIds.size) {
+    await ctx.reply('Push notifications are disabled. Add ADMIN_IDS to .env or to45.env.');
+    return;
+  }
+
+  if (!isAdmin(ctx.from.id)) {
+    await ctx.reply('You are not allowed to use this command.');
+    return;
+  }
+
+  const message = getPushText(ctx);
+  if (!message) {
+    await ctx.reply('Usage: /push Your notification text');
+    return;
+  }
+
+  const userIds = getBroadcastUserIds(ctx.from.id);
+  if (!userIds.length) {
+    await ctx.reply('No users to notify yet.');
+    return;
+  }
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const userId of userIds) {
+    try {
+      await bot.telegram.sendMessage(userId, message);
+      sent += 1;
+    } catch (error) {
+      failed += 1;
+      console.error(`Could not send push to ${userId}:`, error.description || error.message || error);
+    }
+  }
+
+  await ctx.reply(`Push finished. Sent: ${sent}. Failed: ${failed}.`);
+});
+
 bot.action(/^lang:(ru|en|de)$/, async (ctx) => {
   const lang = ctx.match[1];
   setLang(ctx.from.id, lang);
@@ -883,7 +945,8 @@ async function main() {
   await bot.telegram.setMyCommands([
     { command: 'start', description: 'Start bot / choose language' },
     { command: 'language', description: 'Change language' },
-    { command: 'help', description: 'Show help' }
+    { command: 'help', description: 'Show help' },
+    { command: 'push', description: 'Admin: send notification' }
   ]);
   await bot.launch();
   console.log('Bot is running.');
