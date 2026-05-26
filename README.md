@@ -37,4 +37,4 @@ The token should not be committed to git. If a token was posted publicly, revoke
 - Send an MP3 as an audio file or document, then choose MP4 or MOV.
 - Send a MOV file as a document to convert it to MP4.
 - Choose "Download video", choose a platform, send the link, then choose quality from 144p to 4K.
-- Admins can send `/push Your notification text` to broadcast a message to saved users.
+- Admins can send `/push`, then send text, a photo, or a photo with caption. Press "Отправить" to broadcast it from the bot to saved users.

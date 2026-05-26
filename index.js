@@ -30,6 +30,7 @@ const usersFile = path.join(rootDir, 'users.json');
 
 const bot = new Telegraf(token);
 const userState = loadUserStore();
+const pushDrafts = new Map();
 const maxOutputBytes = Number(process.env.MAX_OUTPUT_MB || 45) * 1024 * 1024;
 
 const platforms = {
@@ -196,10 +197,8 @@ function loadUserStore() {
 function saveUserStore() {
   const data = {};
   for (const [userId, state] of userState.entries()) {
-    data[userKey(userId)] = {
-      lang: state.lang || 'ru',
-      mode: state.mode || 'menu'
-    };
+    data[userKey(userId)] = { mode: state.mode || 'menu' };
+    if (state.lang) data[userKey(userId)].lang = state.lang;
   }
 
   fs.writeFileSync(usersFile, JSON.stringify(data, null, 2));
@@ -216,6 +215,14 @@ function updateUserState(userId, patch) {
   userState.set(key, next);
   saveUserStore();
   return next;
+}
+
+function ensureKnownUser(userId) {
+  if (!userId) return;
+  const key = userKey(userId);
+  if (userState.has(key)) return;
+  userState.set(key, { mode: 'menu' });
+  saveUserStore();
 }
 
 function t(ctx, key, values = {}) {
@@ -254,9 +261,60 @@ function getPushText(ctx) {
   return text.slice(command.length).trim();
 }
 
-function getBroadcastUserIds(exceptUserId) {
-  const except = String(exceptUserId);
-  return [...userState.keys()].filter((userId) => String(userId) !== except);
+function getBroadcastUserIds() {
+  return [...userState.keys()];
+}
+
+function pushKeyboard() {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback('Отправить', 'push:send')],
+    [Markup.button.callback('Отмена', 'push:cancel')]
+  ]);
+}
+
+function getPushDraft(userId) {
+  return pushDrafts.get(userKey(userId));
+}
+
+function setPushDraft(userId, patch) {
+  const key = userKey(userId);
+  const current = pushDrafts.get(key) || {};
+  const next = { ...current, ...patch };
+  pushDrafts.set(key, next);
+  return next;
+}
+
+function clearPushDraft(userId) {
+  pushDrafts.delete(userKey(userId));
+}
+
+function getLargestPhotoFileId(message) {
+  const photos = message?.photo || [];
+  return photos.length ? photos[photos.length - 1].file_id : null;
+}
+
+function describePushDraft(draft) {
+  const parts = ['Черновик push-уведомления:'];
+  parts.push(`Текст: ${draft.text ? 'добавлен' : 'не добавлен'}`);
+  parts.push(`Фото: ${draft.photoFileId ? 'добавлено' : 'не добавлено'}`);
+  parts.push('');
+  parts.push('Можно прислать текст, фото или фото с подписью. Когда всё готово, нажмите «Отправить».');
+  return parts.join('\n');
+}
+
+async function sendPushToUser(userId, draft) {
+  if (draft.photoFileId) {
+    if (draft.text && draft.text.length <= 1024) {
+      await bot.telegram.sendPhoto(userId, draft.photoFileId, { caption: draft.text });
+      return;
+    }
+
+    await bot.telegram.sendPhoto(userId, draft.photoFileId);
+    if (draft.text) await bot.telegram.sendMessage(userId, draft.text);
+    return;
+  }
+
+  await bot.telegram.sendMessage(userId, draft.text);
 }
 
 function getMode(userId) {
@@ -677,6 +735,11 @@ async function sendDownloadedVideo(ctx, filePath, quality, statusMessage) {
   }
 }
 
+bot.use(async (ctx, next) => {
+  ensureKnownUser(ctx.from?.id);
+  return next();
+});
+
 bot.start(async (ctx) => {
   if (!hasLang(ctx.from.id)) {
     await ctx.reply(languages.ru.chooseLanguage, languageKeyboard());
@@ -705,23 +768,53 @@ bot.command('push', async (ctx) => {
   }
 
   const message = getPushText(ctx);
-  if (!message) {
-    await ctx.reply('Usage: /push Your notification text');
+  const draft = setPushDraft(ctx.from.id, { text: message || undefined, photoFileId: undefined });
+  await ctx.reply(describePushDraft(draft), pushKeyboard());
+});
+
+bot.action('push:cancel', async (ctx) => {
+  if (!isAdmin(ctx.from.id) || !getPushDraft(ctx.from.id)) {
+    await ctx.answerCbQuery();
     return;
   }
 
-  const userIds = getBroadcastUserIds(ctx.from.id);
+  clearPushDraft(ctx.from.id);
+  await ctx.answerCbQuery('Отменено');
+  await ctx.editMessageText('Push-уведомление отменено.').catch(() => ctx.reply('Push-уведомление отменено.'));
+});
+
+bot.action('push:send', async (ctx) => {
+  if (!isAdmin(ctx.from.id)) {
+    await ctx.answerCbQuery();
+    return;
+  }
+
+  const draft = getPushDraft(ctx.from.id);
+  if (!draft) {
+    await ctx.answerCbQuery('Нет черновика');
+    return;
+  }
+
+  if (!draft.text && !draft.photoFileId) {
+    await ctx.answerCbQuery('Добавьте текст или фото');
+    return;
+  }
+
+  const userIds = getBroadcastUserIds();
   if (!userIds.length) {
+    await ctx.answerCbQuery();
     await ctx.reply('No users to notify yet.');
     return;
   }
+
+  await ctx.answerCbQuery('Отправляю');
 
   let sent = 0;
   let failed = 0;
 
   for (const userId of userIds) {
     try {
-      await bot.telegram.sendMessage(userId, message);
+      await sendPushToUser(userId, draft);
       sent += 1;
     } catch (error) {
       failed += 1;
@@ -729,6 +822,7 @@ bot.command('push', async (ctx) => {
     }
   }
 
+  clearPushDraft(ctx.from.id);
   await ctx.reply(`Push finished. Sent: ${sent}. Failed: ${failed}.`);
 });
 
@@ -845,6 +939,21 @@ bot.action(/^quality:(144|240|360|480|720|1080|1440|2160)$/, async (ctx) => {
   }
 });
 
+bot.on('photo', async (ctx) => {
+  if (!isAdmin(ctx.from.id) || !getPushDraft(ctx.from.id)) {
+    return;
+  }
+
+  const photoFileId = getLargestPhotoFileId(ctx.message);
+  const caption = ctx.message.caption?.trim();
+  const draft = setPushDraft(ctx.from.id, {
+    photoFileId,
+    ...(caption ? { text: caption } : {})
+  });
+
+  await ctx.reply(describePushDraft(draft), pushKeyboard());
+});
+
 bot.on(['audio', 'document', 'video'], async (ctx) => {
   if (!hasLang(ctx.from.id)) {
     await ctx.reply(languages.ru.chooseLanguage, languageKeyboard());
@@ -909,6 +1018,15 @@ bot.on(['audio', 'document', 'video'], async (ctx) => {
 });
 
 bot.on('text', async (ctx) => {
+  if (isAdmin(ctx.from.id) && getPushDraft(ctx.from.id)) {
+    const text = ctx.message.text.trim();
+    if (text.startsWith('/')) return;
+
+    const draft = setPushDraft(ctx.from.id, { text });
+    await ctx.reply(describePushDraft(draft), pushKeyboard());
+    return;
+  }
+
   if (!hasLang(ctx.from.id)) {
     await ctx.reply(languages.ru.chooseLanguage, languageKeyboard());
     return;
