@@ -67,102 +67,36 @@ const qualities = [
   { id: '2160', label: '4K', height: 2160 }
 ];
 
-const languages = {
-  ru: {
-    name: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439',
-    chooseLanguage: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u044f\u0437\u044b\u043a:',
-    languageSaved: '\u042f\u0437\u044b\u043a \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d. \u041e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 MP3, MOV \u0438\u043b\u0438 \u0441\u0441\u044b\u043b\u043a\u0443 Instagram, YouTube, TikTok, VK Video, Rutube.',
-    start: '\u041f\u0440\u0438\u0432\u0435\u0442! \u042f \u043a\u043e\u043d\u0432\u0435\u0440\u0442\u0438\u0440\u0443\u044e MP3 \u0432 MP4/MOV, MOV \u0432 MP4 \u0438 \u0441\u043a\u0430\u0447\u0438\u0432\u0430\u044e \u0432\u0438\u0434\u0435\u043e \u043f\u043e \u0441\u0441\u044b\u043b\u043a\u0430\u043c Instagram, YouTube, TikTok, VK Video, Rutube.',
-    help: '\u041e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 MP3 \u043a\u0430\u043a \u0430\u0443\u0434\u0438\u043e \u0438\u043b\u0438 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442, \u0437\u0430\u0442\u0435\u043c \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 MP4 \u0438\u043b\u0438 MOV. MOV-\u0444\u0430\u0439\u043b \u044f \u0441\u0440\u0430\u0437\u0443 \u043a\u043e\u043d\u0432\u0435\u0440\u0442\u0438\u0440\u0443\u044e \u0432 MP4. \u0422\u0430\u043a\u0436\u0435 \u043c\u043e\u0436\u043d\u043e \u043f\u0440\u0438\u0441\u043b\u0430\u0442\u044c \u0441\u0441\u044b\u043b\u043a\u0443 \u043d\u0430 \u0432\u0438\u0434\u0435\u043e.',
-    chooseFormat: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u043e\u0440\u043c\u0430\u0442 \u043a\u043e\u043d\u0432\u0435\u0440\u0442\u0430\u0446\u0438\u0438:',
-    downloadingFile: '\u0421\u043a\u0430\u0447\u0438\u0432\u0430\u044e \u0444\u0430\u0439\u043b...',
-    converting: '\u041a\u043e\u043d\u0432\u0435\u0440\u0442\u0438\u0440\u0443\u044e \u0432 {format}...',
-    converted: '\u0413\u043e\u0442\u043e\u0432\u043e: {file}',
-    downloadingVideo: '\u0421\u043a\u0430\u0447\u0438\u0432\u0430\u044e \u0432\u0438\u0434\u0435\u043e...',
-    unsupportedLink: '\u041f\u043e\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u044e\u0442\u0441\u044f \u0441\u0441\u044b\u043b\u043a\u0438 Instagram, YouTube, TikTok, VK Video \u0438 Rutube.',
-    sendSupported: '\u041e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 MP3, MOV \u0438\u043b\u0438 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u043c\u0443\u044e \u0441\u0441\u044b\u043b\u043a\u0443.',
-    noPendingFile: '\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u043e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 MP3-\u0444\u0430\u0439\u043b.',
-    tooLarge: '\u0424\u0430\u0439\u043b \u043f\u043e\u043b\u0443\u0447\u0438\u043b\u0441\u044f \u0441\u043b\u0438\u0448\u043a\u043e\u043c \u0431\u043e\u043b\u044c\u0448\u0438\u043c \u0434\u043b\u044f \u043e\u0442\u043f\u0440\u0430\u0432\u043a\u0438 \u0447\u0435\u0440\u0435\u0437 Telegram.',
-    toolMissing: '\u041d\u0430 \u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440\u0435 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u043e: {tool}. \u0423\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u0435 \u0435\u0433\u043e \u0438 \u0434\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u0432 PATH.',
-    failed: '\u041d\u0435 \u043f\u043e\u043b\u0443\u0447\u0438\u043b\u043e\u0441\u044c \u0432\u044b\u043f\u043e\u043b\u043d\u0438\u0442\u044c \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u044e. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0444\u0430\u0439\u043b/\u0441\u0441\u044b\u043b\u043a\u0443 \u0438 \u0443\u0442\u0438\u043b\u0438\u0442\u044b.',
-    mainMenu: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435:',
-    convertMenu: '\u041f\u0440\u0438\u0448\u043b\u0438\u0442\u0435 MP3 \u0438\u043b\u0438 MOV-\u0444\u0430\u0439\u043b.',
-    downloadMenu: 'Выберите платформу:',
-    platformChosen: 'Пришлите ссылку {platform}.',
-    wrongPlatform: 'Эта ссылка не похожа на {platform}. Выберите правильную платформу или пришлите подходящую ссылку.',
-    chooseQuality: 'Выберите качество:',
-    qualityChosen: 'Скачиваю {quality}...',
-    compressingVideo: 'Файл больше лимита Telegram. Сжимаю видео, чтобы отправить его клиенту...',
-    convertFilesButton: '\uD83D\uDCE6 \u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0430\u0446\u0438\u044F \u0444\u0430\u0439\u043B\u043E\u0432',
-    downloadVideoButton: '\u26A1 \u0421\u043A\u0430\u0447\u0430\u0442\u044C \u0432\u0438\u0434\u0435\u043E',
-    backButton: '\u2B05 \u041D\u0430\u0437\u0430\u0434',
-    chooseFromMenu: '\u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0440\u0430\u0437\u0434\u0435\u043B \u0432 \u043C\u0435\u043D\u044E.',
-    commands: '\u041a\u043e\u043c\u0430\u043d\u0434\u044b: /start, /language, /help'
-  },
-  en: {
-    name: 'English',
-    chooseLanguage: 'Choose a language:',
-    languageSaved: 'Language saved. Send an MP3, MOV, or an Instagram, YouTube, TikTok, VK Video, Rutube link.',
-    start: 'Hi! I convert MP3 to MP4/MOV, MOV to MP4, and download videos from Instagram, YouTube, TikTok, VK Video, and Rutube links.',
-    help: 'Send an MP3 as audio or document, then choose MP4 or MOV. Send a MOV file and I will convert it to MP4. You can also send a video link.',
-    chooseFormat: 'Choose conversion format:',
-    downloadingFile: 'Downloading file...',
-    converting: 'Converting to {format}...',
-    converted: 'Done: {file}',
-    downloadingVideo: 'Downloading video...',
-    unsupportedLink: 'Only Instagram, YouTube, TikTok, VK Video, and Rutube links are supported.',
-    sendSupported: 'Send an MP3, MOV, or a supported link.',
-    noPendingFile: 'Please send an MP3 file first.',
-    tooLarge: 'The output file is too large to send through Telegram.',
-    toolMissing: 'Missing tool on this computer: {tool}. Install it and add it to PATH.',
-    failed: 'The operation failed. Check the file/link and tools.',
-    mainMenu: 'Choose an action:',
-    convertMenu: 'Send an MP3 or MOV file.',
-    downloadMenu: 'Choose a platform:',
-    platformChosen: 'Send a {platform} link.',
-    wrongPlatform: 'This link does not look like {platform}. Choose the right platform or send a matching link.',
-    chooseQuality: 'Choose quality:',
-    qualityChosen: 'Downloading {quality}...',
-    compressingVideo: 'The file is above the Telegram limit. Compressing it so it can be sent...',
-    convertFilesButton: '\uD83D\uDCE6 Convert files',
-    downloadVideoButton: '\u26A1 Download video',
-    backButton: '\u2B05 Back',
-    chooseFromMenu: 'Choose a section from the menu first.',
-    commands: 'Commands: /start, /language, /help'
-  },
-  de: {
-    name: 'Deutsch',
-    chooseLanguage: 'Sprache ausw\u00e4hlen:',
-    languageSaved: 'Sprache gespeichert. Sende eine MP3, MOV oder einen Instagram-, YouTube-, TikTok-, VK-Video- oder Rutube-Link.',
-    start: 'Hallo! Ich konvertiere MP3 zu MP4/MOV, MOV zu MP4 und lade Videos von Instagram, YouTube, TikTok, VK Video und Rutube herunter.',
-    help: 'Sende eine MP3 als Audio oder Dokument und w\u00e4hle danach MP4 oder MOV. Eine MOV-Datei konvertiere ich direkt zu MP4. Du kannst auch einen Videolink senden.',
-    chooseFormat: 'Zielformat ausw\u00e4hlen:',
-    downloadingFile: 'Datei wird heruntergeladen...',
-    converting: 'Konvertiere zu {format}...',
-    converted: 'Fertig: {file}',
-    downloadingVideo: 'Video wird heruntergeladen...',
-    unsupportedLink: 'Es werden nur Instagram-, YouTube-, TikTok-, VK-Video- und Rutube-Links unterst\u00fctzt.',
-    sendSupported: 'Sende eine MP3, MOV oder einen unterst\u00fctzten Link.',
-    noPendingFile: 'Bitte sende zuerst eine MP3-Datei.',
-    tooLarge: 'Die Ausgabedatei ist zu gro\u00df f\u00fcr Telegram.',
-    toolMissing: 'Fehlendes Programm auf diesem Computer: {tool}. Installiere es und f\u00fcge es zu PATH hinzu.',
-    failed: 'Der Vorgang ist fehlgeschlagen. Pr\u00fcfe Datei/Link und Programme.',
-    mainMenu: 'Aktion ausw\u00e4hlen:',
-    convertMenu: 'Sende eine MP3- oder MOV-Datei.',
-    downloadMenu: 'Plattform ausw\u00e4hlen:',
-    platformChosen: 'Sende einen {platform}-Link.',
-    wrongPlatform: 'Dieser Link sieht nicht wie {platform} aus. W\u00e4hle die richtige Plattform oder sende einen passenden Link.',
-    chooseQuality: 'Qualit\u00e4t ausw\u00e4hlen:',
-    qualityChosen: '{quality} wird heruntergeladen...',
-    compressingVideo: 'Die Datei ist gr\u00f6\u00dfer als das Telegram-Limit. Komprimiere sie zum Senden...',
-    convertFilesButton: '\uD83D\uDCE6 Dateien konvertieren',
-    downloadVideoButton: '\u26A1 Video herunterladen',
-    backButton: '\u2B05 Zur\u00fcck',
-    chooseFromMenu: 'W\u00e4hle zuerst einen Bereich im Men\u00fc.',
-    commands: 'Befehle: /start, /language, /help'
-  }
+const messages = {
+  start: 'Привет! Выберите действие кнопкой ниже.',
+  help: 'Выберите нужную конвертацию кнопкой, затем отправьте файл подходящего формата. Также можно скачать видео по ссылке.',
+  downloadingFile: 'Скачиваю файл...',
+  converting: 'Конвертирую в {format}...',
+  converted: 'Готово: {file}',
+  downloadingVideo: 'Скачиваю видео...',
+  unsupportedLink: 'Поддерживаются ссылки Instagram, YouTube, TikTok, VK Video и Rutube.',
+  sendMp3: 'Отправьте MP3-файл для конвертации в MP4.',
+  sendMp4: 'Отправьте MP4-файл для конвертации в MP3.',
+  sendSupported: 'Отправьте файл подходящего формата для выбранной конвертации.',
+  tooLarge: 'Файл получился слишком большим для отправки через Telegram.',
+  toolMissing: 'На компьютере не найдено: {tool}. Установите его и добавьте в PATH.',
+  failed: 'Не получилось выполнить операцию. Проверьте файл/ссылку и утилиты.',
+  mainMenu: 'Выберите действие:',
+  convertMenu: 'Выберите тип конвертации:',
+  downloadMenu: 'Выберите платформу:',
+  platformChosen: 'Пришлите ссылку {platform}.',
+  wrongPlatform: 'Эта ссылка не похожа на {platform}. Выберите правильную платформу или пришлите подходящую ссылку.',
+  chooseQuality: 'Выберите качество:',
+  qualityChosen: 'Скачиваю {quality}...',
+  compressingVideo: 'Файл больше лимита Telegram. Сжимаю видео, чтобы отправить его клиенту...',
+  convertFilesButton: 'Конвертация файлов',
+  mp4ToMp3Button: 'MP4 в MP3',
+  mp3ToMp4Button: 'MP3 в MP4',
+  downloadVideoButton: 'Скачать видео',
+  backButton: 'Назад',
+  chooseFromMenu: 'Сначала выберите раздел в меню.',
+  commands: 'Команды: /start, /help'
 };
-
 function loadEnv() {
   for (const fileName of ['.env', 'to45.env']) {
     const envPath = path.join(__dirname, fileName);
@@ -198,7 +132,6 @@ function saveUserStore() {
   const data = {};
   for (const [userId, state] of userState.entries()) {
     data[userKey(userId)] = { mode: state.mode || 'menu' };
-    if (state.lang) data[userKey(userId)].lang = state.lang;
   }
 
   fs.writeFileSync(usersFile, JSON.stringify(data, null, 2));
@@ -226,24 +159,11 @@ function ensureKnownUser(userId) {
 }
 
 function t(ctx, key, values = {}) {
-  const lang = getLang(ctx);
-  let text = languages[lang][key] || languages.en[key] || key;
+  let text = messages[key] || key;
   for (const [name, value] of Object.entries(values)) {
     text = text.replaceAll(`{${name}}`, value);
   }
   return text;
-}
-
-function getLang(ctx) {
-  return userState.get(userKey(ctx.from?.id))?.lang || 'ru';
-}
-
-function hasLang(userId) {
-  return Boolean(userState.get(userKey(userId))?.lang);
-}
-
-function setLang(userId, lang) {
-  updateUserState(userId, { lang, mode: 'menu' });
 }
 
 function setMode(userId, mode) {
@@ -321,19 +241,9 @@ function getMode(userId) {
   return userState.get(userKey(userId))?.mode || 'menu';
 }
 
-function setPendingAudio(userId, filePath) {
-  const key = userKey(userId);
-  const current = userState.get(key) || { lang: 'ru' };
-  userState.set(key, { ...current, pendingAudio: filePath });
-}
-
-function getPendingAudio(userId) {
-  return userState.get(userKey(userId))?.pendingAudio;
-}
-
 function setPendingDownload(userId, patch) {
   const key = userKey(userId);
-  const current = userState.get(key) || { lang: 'ru' };
+  const current = userState.get(key) || {};
   const pendingDownload = { ...(current.pendingDownload || {}), ...patch };
   userState.set(key, { ...current, pendingDownload });
 }
@@ -344,16 +254,8 @@ function getPendingDownload(userId) {
 
 function clearPendingDownload(userId) {
   const key = userKey(userId);
-  const current = userState.get(key) || { lang: 'ru' };
+  const current = userState.get(key) || {};
   userState.set(key, { ...current, pendingDownload: undefined });
-}
-
-function languageKeyboard() {
-  return Markup.inlineKeyboard([
-    [Markup.button.callback('Deutsch', 'lang:de')],
-    [Markup.button.callback('English', 'lang:en')],
-    [Markup.button.callback('\u0420\u0443\u0441\u0441\u043a\u0438\u0439', 'lang:ru')]
-  ]);
 }
 
 function mainMenuKeyboard(ctx) {
@@ -369,10 +271,10 @@ function backKeyboard(ctx) {
   ]);
 }
 
-function formatKeyboard(ctx) {
+function convertKeyboard(ctx) {
   return Markup.inlineKeyboard([
-    [Markup.button.callback('MP4', 'convert:mp4')],
-    [Markup.button.callback('MOV', 'convert:mov')],
+    [Markup.button.callback(t(ctx, 'mp4ToMp3Button'), 'convert:mp4_to_mp3')],
+    [Markup.button.callback(t(ctx, 'mp3ToMp4Button'), 'convert:mp3_to_mp4')],
     [Markup.button.callback(t(ctx, 'backButton'), 'menu:back')]
   ]);
 }
@@ -456,7 +358,7 @@ function getMessageFile(message) {
   if (video) {
     return {
       fileId: video.file_id,
-      fileName: video.file_name || 'video.mov',
+      fileName: video.file_name || 'video.mp4',
       mimeType: video.mime_type || ''
     };
   }
@@ -467,7 +369,7 @@ function getMediaKind(file) {
   const fileName = file.fileName.toLowerCase();
   const mimeType = file.mimeType.toLowerCase();
   if (fileName.endsWith('.mp3') || mimeType === 'audio/mpeg') return 'mp3';
-  if (fileName.endsWith('.mov') || mimeType === 'video/quicktime') return 'mov';
+  if (fileName.endsWith('.mp4') || mimeType === 'video/mp4') return 'mp4';
   return null;
 }
 
@@ -550,33 +452,30 @@ function runProcess(command, args, options = {}) {
   });
 }
 
-async function convertMp3ToVideo(input, output, format) {
-  const codecArgs = format === 'mov'
-    ? ['-c:v', 'mpeg4', '-q:v', '4', '-c:a', 'aac', '-b:a', '192k']
-    : ['-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'stillimage', '-c:a', 'aac', '-b:a', '192k'];
-
+async function convertMp3ToMp4(input, output) {
   await runProcess('ffmpeg', [
     '-y',
     '-f', 'lavfi',
     '-i', 'color=c=0x111827:s=1280x720:r=30',
     '-i', input,
     '-shortest',
-    ...codecArgs,
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',
+    '-tune', 'stillimage',
+    '-c:a', 'aac',
+    '-b:a', '192k',
     '-pix_fmt', 'yuv420p',
     output
   ]);
 }
 
-async function convertMovToMp4(input, output) {
+async function convertMp4ToMp3(input, output) {
   await runProcess('ffmpeg', [
     '-y',
     '-i', input,
-    '-c:v', 'libx264',
-    '-preset', 'veryfast',
-    '-c:a', 'aac',
+    '-vn',
+    '-c:a', 'libmp3lame',
     '-b:a', '192k',
-    '-movflags', '+faststart',
-    '-pix_fmt', 'yuv420p',
     output
   ]);
 }
@@ -691,6 +590,8 @@ async function sendConvertedFile(ctx, filePath, format) {
   const options = { caption: t(ctx, 'converted', { file: path.basename(filePath) }) };
   if (format === 'mp4') {
     await ctx.replyWithVideo(payload, options);
+  } else if (format === 'mp3') {
+    await ctx.replyWithAudio(payload, options);
   } else {
     await ctx.replyWithDocument(payload, options);
   }
@@ -741,20 +642,11 @@ bot.use(async (ctx, next) => {
 });
 
 bot.start(async (ctx) => {
-  if (!hasLang(ctx.from.id)) {
-    await ctx.reply(languages.ru.chooseLanguage, languageKeyboard());
-    return;
-  }
-
   await showMainMenu(ctx);
-});
-
-bot.command('language', async (ctx) => {
-  await ctx.reply(t(ctx, 'chooseLanguage'), languageKeyboard());
 });
 
 bot.help(async (ctx) => {
-  await showMainMenu(ctx);
+  await ctx.reply(t(ctx, 'help'), mainMenuKeyboard(ctx));
 });
 
 bot.command('push', async (ctx) => {
@@ -826,17 +718,10 @@ bot.action('push:send', async (ctx) => {
   await ctx.reply(`Push finished. Sent: ${sent}. Failed: ${failed}.`);
 });
 
-bot.action(/^lang:(ru|en|de)$/, async (ctx) => {
-  const lang = ctx.match[1];
-  setLang(ctx.from.id, lang);
-  await ctx.answerCbQuery(languages[lang].name);
-  await ctx.editMessageText(languages[lang].mainMenu, mainMenuKeyboard(ctx));
-});
-
 bot.action('menu:convert', async (ctx) => {
   setMode(ctx.from.id, 'convert');
   await ctx.answerCbQuery();
-  await ctx.editMessageText(t(ctx, 'convertMenu'), backKeyboard(ctx));
+  await ctx.editMessageText(t(ctx, 'convertMenu'), convertKeyboard(ctx));
 });
 
 bot.action('menu:download', async (ctx) => {
@@ -847,8 +732,6 @@ bot.action('menu:download', async (ctx) => {
 });
 
 bot.action('menu:back', async (ctx) => {
-  await cleanup([getPendingAudio(ctx.from.id)]);
-  setPendingAudio(ctx.from.id, undefined);
   clearPendingDownload(ctx.from.id);
   await ctx.answerCbQuery();
   await showMainMenu(ctx, true);
@@ -866,35 +749,16 @@ bot.action(/^platform:(instagram|youtube|tiktok|vk|rutube)$/, async (ctx) => {
   );
 });
 
-bot.action(/^convert:(mp4|mov)$/, async (ctx) => {
-  const format = ctx.match[1];
-  const input = getPendingAudio(ctx.from.id);
-  if (!input) {
-    await ctx.answerCbQuery();
-    await ctx.reply(t(ctx, 'noPendingFile'));
-    return;
-  }
+bot.action('convert:mp4_to_mp3', async (ctx) => {
+  setMode(ctx.from.id, 'convert_mp4_to_mp3');
+  await ctx.answerCbQuery('MP4 в MP3');
+  await ctx.editMessageText(t(ctx, 'sendMp4'), backKeyboard(ctx));
+});
 
-  await ctx.answerCbQuery(format.toUpperCase());
-  if (!(await requireTool(ctx, 'ffmpeg'))) return;
-
-  const output = path.join(downloadsDir, `${Date.now()}-${crypto.randomUUID()}.${format}`);
-  let statusMessage;
-  try {
-    statusMessage = await ctx.reply(t(ctx, 'converting', { format: format.toUpperCase() }));
-    await convertMp3ToVideo(input, output, format);
-    if (await assertSendable(ctx, output)) {
-      await sendConvertedFile(ctx, output, format);
-    }
-    await deleteMessageSafe(ctx, statusMessage);
-  } catch (error) {
-    console.error(error);
-    await ctx.reply(t(ctx, 'failed'));
-  } finally {
-    await deleteMessageSafe(ctx, statusMessage);
-    await cleanup([input, output]);
-    setPendingAudio(ctx.from.id, undefined);
-  }
+bot.action('convert:mp3_to_mp4', async (ctx) => {
+  setMode(ctx.from.id, 'convert_mp3_to_mp4');
+  await ctx.answerCbQuery('MP3 в MP4');
+  await ctx.editMessageText(t(ctx, 'sendMp3'), backKeyboard(ctx));
 });
 
 bot.action(/^quality:(144|240|360|480|720|1080|1440|2160)$/, async (ctx) => {
@@ -955,12 +819,8 @@ bot.on('photo', async (ctx) => {
 });
 
 bot.on(['audio', 'document', 'video'], async (ctx) => {
-  if (!hasLang(ctx.from.id)) {
-    await ctx.reply(languages.ru.chooseLanguage, languageKeyboard());
-    return;
-  }
-
-  if (getMode(ctx.from.id) !== 'convert') {
+  const mode = getMode(ctx.from.id);
+  if (!['convert_mp4_to_mp3', 'convert_mp3_to_mp4'].includes(mode)) {
     await ctx.reply(t(ctx, 'chooseFromMenu'), mainMenuKeyboard(ctx));
     return;
   }
@@ -973,39 +833,39 @@ bot.on(['audio', 'document', 'video'], async (ctx) => {
     return;
   }
 
-  if (kind === 'mp3') {
-    const statusMessage = await ctx.reply(t(ctx, 'downloadingFile'));
-    const input = await downloadTelegramFile(ctx, telegramFile, '.mp3').catch(async (error) => {
-      console.error(error);
-      await ctx.reply(t(ctx, 'failed'));
-      return null;
-    });
-    await deleteMessageSafe(ctx, statusMessage);
-    if (!input) return;
+  if (mode === 'convert_mp4_to_mp3' && kind !== 'mp4') {
+    await ctx.reply(t(ctx, 'sendMp4'), backKeyboard(ctx));
+    return;
+  }
 
-    await cleanup([getPendingAudio(ctx.from.id)]);
-    setPendingAudio(ctx.from.id, input);
-    await ctx.reply(t(ctx, 'chooseFormat'), formatKeyboard(ctx));
+  if (mode === 'convert_mp3_to_mp4' && kind !== 'mp3') {
+    await ctx.reply(t(ctx, 'sendMp3'), backKeyboard(ctx));
     return;
   }
 
   if (!(await requireTool(ctx, 'ffmpeg'))) return;
 
   let input;
-  const output = path.join(downloadsDir, `${Date.now()}-${crypto.randomUUID()}.mp4`);
+  const outputFormat = mode === 'convert_mp4_to_mp3' ? 'mp3' : 'mp4';
+  const inputExtension = kind === 'mp4' ? '.mp4' : '.mp3';
+  const output = path.join(downloadsDir, `${Date.now()}-${crypto.randomUUID()}.${outputFormat}`);
   let statusMessage;
   try {
     statusMessage = await ctx.reply(t(ctx, 'downloadingFile'));
-    input = await downloadTelegramFile(ctx, telegramFile, '.mov');
+    input = await downloadTelegramFile(ctx, telegramFile, inputExtension);
     await ctx.telegram.editMessageText(
       ctx.chat.id,
       statusMessage.message_id,
       undefined,
-      t(ctx, 'converting', { format: 'MP4' })
+      t(ctx, 'converting', { format: outputFormat.toUpperCase() })
     ).catch(() => {});
-    await convertMovToMp4(input, output);
+    if (outputFormat === 'mp3') {
+      await convertMp4ToMp3(input, output);
+    } else {
+      await convertMp3ToMp4(input, output);
+    }
     if (await assertSendable(ctx, output)) {
-      await sendConvertedFile(ctx, output, 'mp4');
+      await sendConvertedFile(ctx, output, outputFormat);
     }
     await deleteMessageSafe(ctx, statusMessage);
   } catch (error) {
@@ -1024,11 +884,6 @@ bot.on('text', async (ctx) => {
 
     const draft = setPushDraft(ctx.from.id, { text });
     await ctx.reply(describePushDraft(draft), pushKeyboard());
-    return;
-  }
-
-  if (!hasLang(ctx.from.id)) {
-    await ctx.reply(languages.ru.chooseLanguage, languageKeyboard());
     return;
   }
 
@@ -1069,8 +924,7 @@ bot.catch((error, ctx) => {
 async function main() {
   await ensureDirs();
   const userCommands = [
-    { command: 'start', description: 'Start bot / choose language' },
-    { command: 'language', description: 'Change language' },
+    { command: 'start', description: 'Open menu' },
     { command: 'help', description: 'Show help' }
   ];
   const adminCommands = [
