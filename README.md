@@ -15,21 +15,18 @@ Telegram bot that:
 Install these programs and make sure they are available in `PATH`:
 
 - Node.js 18+
-- FFmpeg: `ffmpeg` and `ffprobe`
 - yt-dlp: `yt-dlp`
 
-On Windows, the easiest way is:
+FFmpeg and ffprobe are installed as npm dependencies and are used automatically by the bot. On Windows, the easiest way to install the remaining system tools is:
 
 ```powershell
 winget install OpenJS.NodeJS.LTS
-winget install Gyan.FFmpeg
 winget install yt-dlp.yt-dlp
 ```
 
 If `winget` is not available, download manually:
 
 - Node.js: https://nodejs.org/
-- FFmpeg builds: https://www.gyan.dev/ffmpeg/builds/
 - yt-dlp: https://github.com/yt-dlp/yt-dlp/releases
 
 After installation, check:
@@ -37,8 +34,6 @@ After installation, check:
 ```powershell
 node -v
 npm -v
-ffmpeg -version
-ffprobe -version
 yt-dlp --version
 ```
 

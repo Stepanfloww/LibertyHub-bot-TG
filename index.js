@@ -7,6 +7,19 @@ const http = require('http');
 const https = require('https');
 const { spawn } = require('child_process');
 
+let ffmpegPath;
+let ffprobePath;
+try {
+  ffmpegPath = require('ffmpeg-static');
+} catch {
+  ffmpegPath = null;
+}
+try {
+  ffprobePath = require('ffprobe-static').path;
+} catch {
+  ffprobePath = null;
+}
+
 loadEnv();
 
 const token = process.env.BOT_TOKEN;
@@ -32,6 +45,7 @@ const bot = new Telegraf(token);
 const userState = loadUserStore();
 const pushDrafts = new Map();
 const maxOutputBytes = Number(process.env.MAX_OUTPUT_MB || 45) * 1024 * 1024;
+const maxInputBytes = Number(process.env.MAX_INPUT_MB || 20) * 1024 * 1024;
 
 const platforms = {
   instagram: {
@@ -102,6 +116,7 @@ const messages = {
   sendMp4: 'Отправьте MP4-файл для конвертации в MP3.',
   sendSupported: 'Отправьте файл подходящего формата для выбранной конвертации.',
   tooLarge: 'Файл получился слишком большим для отправки через Telegram.',
+  inputTooLarge: 'Этот файл слишком большой для скачивания ботом. Отправьте файл до {limit} МБ или сожмите видео перед конвертацией.',
   toolMissing: 'На компьютере не найдено: {tool}. Установите его и добавьте в PATH.',
   failed: 'Не получилось выполнить операцию. Проверьте файл/ссылку и утилиты.',
   mainMenu: 'Выберите действие:',
@@ -398,21 +413,24 @@ function getMessageFile(message) {
     return {
       fileId: document.file_id,
       fileName: document.file_name || 'file',
-      mimeType: document.mime_type || ''
+      mimeType: document.mime_type || '',
+      fileSize: document.file_size || 0
     };
   }
   if (audio) {
     return {
       fileId: audio.file_id,
       fileName: audio.file_name || 'audio.mp3',
-      mimeType: audio.mime_type || ''
+      mimeType: audio.mime_type || '',
+      fileSize: audio.file_size || 0
     };
   }
   if (video) {
     return {
       fileId: video.file_id,
       fileName: video.file_name || 'video.mp4',
-      mimeType: video.mime_type || ''
+      mimeType: video.mime_type || '',
+      fileSize: video.file_size || 0
     };
   }
   return null;
@@ -437,6 +455,8 @@ async function ensureDirs() {
 }
 
 async function commandExists(command) {
+  if (resolveToolPath(command) !== command) return true;
+
   const checker = process.platform === 'win32' ? 'where' : 'which';
   return new Promise((resolve) => {
     const child = spawn(checker, [command], { windowsHide: true });
@@ -452,6 +472,12 @@ async function requireTool(ctx, command) {
     return false;
   }
   return true;
+}
+
+function resolveToolPath(command) {
+  if (command === 'ffmpeg' && ffmpegPath) return ffmpegPath;
+  if (command === 'ffprobe' && ffprobePath) return ffprobePath;
+  return command;
 }
 
 async function downloadUrl(url, destination) {
@@ -482,7 +508,8 @@ async function downloadUrl(url, destination) {
 
 function runProcess(command, args, options = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { windowsHide: true, ...options });
+    const executable = resolveToolPath(command);
+    const child = spawn(executable, args, { windowsHide: true, ...options });
     let stdout = '';
     let stderr = '';
 
@@ -924,6 +951,14 @@ bot.on(['audio', 'document', 'video'], async (ctx) => {
 
   if (mode === 'convert_mp3_to_mp4' && kind !== 'mp3') {
     await ctx.reply(t(ctx, 'sendMp3'), backKeyboard(ctx));
+    return;
+  }
+
+  if (telegramFile.fileSize > maxInputBytes) {
+    await ctx.reply(
+      t(ctx, 'inputTooLarge', { limit: Math.floor(maxInputBytes / 1024 / 1024) }),
+      backKeyboard(ctx)
+    );
     return;
   }
 
