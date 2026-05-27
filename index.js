@@ -56,6 +56,29 @@ const platforms = {
   }
 };
 
+const musicPlatforms = {
+  yandex_music: {
+    label: 'Yandex Music',
+    hosts: ['music.yandex.ru']
+  },
+  vk_music: {
+    label: 'VK Music',
+    hosts: ['vk.com', 'm.vk.com', 'vk.ru']
+  },
+  youtube_music: {
+    label: 'YouTube Music',
+    hosts: ['music.youtube.com', 'youtube.com', 'youtu.be', 'm.youtube.com']
+  },
+  spotify: {
+    label: 'Spotify',
+    hosts: ['open.spotify.com', 'spotify.com']
+  },
+  soundcloud: {
+    label: 'SoundCloud',
+    hosts: ['soundcloud.com', 'm.soundcloud.com']
+  }
+};
+
 const qualities = [
   { id: '144', label: '144p', height: 144 },
   { id: '240', label: '240p', height: 240 },
@@ -97,6 +120,14 @@ const messages = {
   chooseFromMenu: 'Сначала выберите раздел в меню.',
   commands: 'Команды: /start, /help'
 };
+Object.assign(messages, {
+  musicDownloadMenu: 'Выберите звуковой сервис:',
+  musicPlatformChosen: 'Пришлите ссылку {platform}. Бот скачает аудио в MP3, если сервис и ссылка поддерживаются yt-dlp.',
+  unsupportedMusicLink: 'Поддерживаются ссылки Yandex Music, VK Music, YouTube Music, Spotify и SoundCloud. Для некоторых сервисов могут понадобиться cookies или аккаунт.',
+  downloadingAudio: 'Скачиваю аудио и конвертирую в MP3...',
+  downloadAudioButton: 'Скачать с звуковых сервисов'
+});
+
 function loadEnv() {
   for (const fileName of ['.env', 'to45.env']) {
     const envPath = path.join(__dirname, fileName);
@@ -261,7 +292,8 @@ function clearPendingDownload(userId) {
 function mainMenuKeyboard(ctx) {
   return Markup.inlineKeyboard([
     [Markup.button.callback(t(ctx, 'convertFilesButton'), 'menu:convert')],
-    [Markup.button.callback(t(ctx, 'downloadVideoButton'), 'menu:download')]
+    [Markup.button.callback(t(ctx, 'downloadVideoButton'), 'menu:download')],
+    [Markup.button.callback(t(ctx, 'downloadAudioButton'), 'menu:download_music')]
   ]);
 }
 
@@ -292,6 +324,19 @@ function platformKeyboard(ctx) {
   ]);
 }
 
+function musicPlatformKeyboard(ctx) {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback(musicPlatforms.yandex_music.label, 'music_platform:yandex_music')],
+    [Markup.button.callback(musicPlatforms.vk_music.label, 'music_platform:vk_music')],
+    [Markup.button.callback(musicPlatforms.youtube_music.label, 'music_platform:youtube_music')],
+    [
+      Markup.button.callback(musicPlatforms.spotify.label, 'music_platform:spotify'),
+      Markup.button.callback(musicPlatforms.soundcloud.label, 'music_platform:soundcloud')
+    ],
+    [Markup.button.callback(t(ctx, 'backButton'), 'menu:back')]
+  ]);
+}
+
 function qualityKeyboard(ctx) {
   return Markup.inlineKeyboard([
     [
@@ -312,12 +357,12 @@ function qualityKeyboard(ctx) {
   ]);
 }
 
-function getPlatformFromUrl(text) {
+function getPlatformIdFromUrl(text, platformMap) {
   try {
     const url = new URL(text.trim());
     const host = url.hostname.replace(/^www\./, '').toLowerCase();
 
-    for (const [platformId, platform] of Object.entries(platforms)) {
+    for (const [platformId, platform] of Object.entries(platformMap)) {
       if (platform.hosts.some((domain) => host === domain || host.endsWith(`.${domain}`))) {
         return platformId;
       }
@@ -327,6 +372,14 @@ function getPlatformFromUrl(text) {
   } catch {
     return null;
   }
+}
+
+function getPlatformFromUrl(text) {
+  return getPlatformIdFromUrl(text, platforms);
+}
+
+function getMusicPlatformFromUrl(text) {
+  return getPlatformIdFromUrl(text, musicPlatforms);
 }
 
 function isSupportedVideoUrl(text) {
@@ -499,6 +552,18 @@ async function downloadSocialVideo(url, outputTemplate, quality) {
     '--merge-output-format', 'mp4',
     '--recode-video', 'mp4',
     '-f', buildFormatSelector(quality.height),
+    '-o', outputTemplate,
+    url
+  ]);
+}
+
+async function downloadMusicAudio(url, outputTemplate) {
+  await runProcess('yt-dlp', [
+    '--no-playlist',
+    '--extract-audio',
+    '--audio-format', 'mp3',
+    '--audio-quality', '0',
+    '--embed-metadata',
     '-o', outputTemplate,
     url
   ]);
@@ -731,6 +796,13 @@ bot.action('menu:download', async (ctx) => {
   await ctx.editMessageText(t(ctx, 'downloadMenu'), platformKeyboard(ctx));
 });
 
+bot.action('menu:download_music', async (ctx) => {
+  setMode(ctx.from.id, 'music_download');
+  clearPendingDownload(ctx.from.id);
+  await ctx.answerCbQuery();
+  await ctx.editMessageText(t(ctx, 'musicDownloadMenu'), musicPlatformKeyboard(ctx));
+});
+
 bot.action('menu:back', async (ctx) => {
   clearPendingDownload(ctx.from.id);
   await ctx.answerCbQuery();
@@ -745,6 +817,18 @@ bot.action(/^platform:(instagram|youtube|tiktok|vk|rutube)$/, async (ctx) => {
   await ctx.answerCbQuery(platform.label);
   await ctx.editMessageText(
     t(ctx, 'platformChosen', { platform: platform.label }),
+    backKeyboard(ctx)
+  );
+});
+
+bot.action(/^music_platform:(yandex_music|vk_music|youtube_music|spotify|soundcloud)$/, async (ctx) => {
+  const platformId = ctx.match[1];
+  const platform = musicPlatforms[platformId];
+  setMode(ctx.from.id, 'music_url');
+  setPendingDownload(ctx.from.id, { platform: platformId, url: undefined });
+  await ctx.answerCbQuery(platform.label);
+  await ctx.editMessageText(
+    t(ctx, 'musicPlatformChosen', { platform: platform.label }),
     backKeyboard(ctx)
   );
 });
@@ -887,12 +971,73 @@ bot.on('text', async (ctx) => {
     return;
   }
 
-  if (getMode(ctx.from.id) !== 'download_url') {
+  const mode = getMode(ctx.from.id);
+  if (!['download_url', 'music_url'].includes(mode)) {
     await ctx.reply(t(ctx, 'chooseFromMenu'), mainMenuKeyboard(ctx));
     return;
   }
 
   const text = ctx.message.text.trim();
+  if (mode === 'music_url') {
+    const urlPlatform = getMusicPlatformFromUrl(text);
+    if (!urlPlatform) {
+      await ctx.reply(t(ctx, 'unsupportedMusicLink'), backKeyboard(ctx));
+      return;
+    }
+
+    const pending = getPendingDownload(ctx.from.id);
+    if (!pending?.platform) {
+      await ctx.reply(t(ctx, 'musicDownloadMenu'), musicPlatformKeyboard(ctx));
+      return;
+    }
+
+    if (pending.platform !== urlPlatform) {
+      await ctx.reply(
+        t(ctx, 'wrongPlatform', { platform: musicPlatforms[pending.platform].label }),
+        musicPlatformKeyboard(ctx)
+      );
+      return;
+    }
+
+    if (!(await requireTool(ctx, 'yt-dlp')) || !(await requireTool(ctx, 'ffmpeg'))) return;
+
+    await ensureDirs();
+
+    const id = `${Date.now()}-${crypto.randomUUID()}`;
+    const outputTemplate = path.join(downloadsDir, `${id}.%(ext)s`);
+    let statusMessage;
+    let downloaded;
+
+    try {
+      statusMessage = await ctx.reply(t(ctx, 'downloadingAudio'));
+      await downloadMusicAudio(text, outputTemplate);
+      const files = await fsp.readdir(downloadsDir);
+      downloaded = files
+        .filter((file) => file.startsWith(id))
+        .map((file) => path.join(downloadsDir, file))[0];
+
+      if (!downloaded) throw new Error('yt-dlp did not create an output audio file.');
+
+      if (await assertSendable(ctx, downloaded)) {
+        await ctx.replyWithAudio(
+          { source: downloaded },
+          { caption: `${musicPlatforms[pending.platform].label} - ${path.basename(downloaded)}` }
+        );
+      }
+
+      await deleteMessageSafe(ctx, statusMessage);
+      clearPendingDownload(ctx.from.id);
+      setMode(ctx.from.id, 'music_download');
+    } catch (error) {
+      console.error(error);
+      await ctx.reply(t(ctx, 'failed'));
+    } finally {
+      await deleteMessageSafe(ctx, statusMessage);
+      await cleanup([downloaded]);
+    }
+    return;
+  }
+
   const urlPlatform = getPlatformFromUrl(text);
   if (!urlPlatform) {
     await ctx.reply(t(ctx, 'unsupportedLink'), backKeyboard(ctx));

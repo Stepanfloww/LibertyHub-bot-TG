@@ -2,20 +2,55 @@
 
 Telegram bot that:
 
-- converts uploaded MP3 files to MP4 with a simple generated video background;
+- converts uploaded MP3 files to MP4 with a generated video background;
 - converts uploaded MP4 files to MP3;
 - downloads videos from Instagram, YouTube, TikTok, VK Video, and Rutube links through `yt-dlp`;
-- asks for a platform and quality from 144p to 4K before downloading;
-- compresses oversized downloads through FFmpeg when needed so Telegram can send them;
+- downloads audio as MP3 from Yandex Music, VK Music, YouTube Music, Spotify, and SoundCloud links when `yt-dlp` supports the link;
+- asks for a video platform and quality from 144p to 4K before downloading;
+- compresses oversized videos through FFmpeg when needed so Telegram can send them;
 - lets admins send push notifications to saved users.
 
-## Requirements
+## What to install
 
-Install these programs and make sure they are available in PATH:
+Install these programs and make sure they are available in `PATH`:
 
 - Node.js 18+
 - FFmpeg: `ffmpeg` and `ffprobe`
 - yt-dlp: `yt-dlp`
+
+On Windows, the easiest way is:
+
+```powershell
+winget install OpenJS.NodeJS.LTS
+winget install Gyan.FFmpeg
+winget install yt-dlp.yt-dlp
+```
+
+If `winget` is not available, download manually:
+
+- Node.js: https://nodejs.org/
+- FFmpeg builds: https://www.gyan.dev/ffmpeg/builds/
+- yt-dlp: https://github.com/yt-dlp/yt-dlp/releases
+
+After installation, check:
+
+```powershell
+node -v
+npm -v
+ffmpeg -version
+ffprobe -version
+yt-dlp --version
+```
+
+## Project dependencies
+
+The npm dependency is already listed in `package.json`:
+
+```powershell
+npm install
+```
+
+No separate npm package is needed for each platform. Video and music downloading is handled by `yt-dlp`, and MP3/MP4 conversion is handled by FFmpeg.
 
 ## Setup
 
@@ -33,6 +68,11 @@ The token should not be committed to git. If a token was posted publicly, revoke
 ## Usage
 
 - Send `/start` to open the menu.
-- Choose "Конвертация файлов", then press "MP4 в MP3" or "MP3 в MP4" and send the matching file.
-- Choose "Download video", choose a platform, send the link, then choose quality from 144p to 4K.
-- Admins can send `/push`, then send text, a photo, or a photo with caption. Press "Отправить" to broadcast it from the bot to saved users.
+- Choose file conversion, then press `MP4 to MP3` or `MP3 to MP4` and send the matching file.
+- Choose video download, choose a platform, send the link, then choose quality from 144p to 4K.
+- Choose audio services, choose Yandex Music, VK Music, YouTube Music, Spotify, or SoundCloud, then send a link.
+- Admins can send `/push`, then send text, a photo, or a photo with caption.
+
+## Notes about music services
+
+Some services restrict downloading or require authorization. For Yandex Music, VK Music, Spotify, and some YouTube Music links, `yt-dlp` may need cookies from a browser or may only support metadata/previews depending on the link and account access. Use this bot only for content you have the right to download.
