@@ -40,6 +40,12 @@ const rootDir = __dirname;
 const tmpDir = path.join(rootDir, 'tmp');
 const downloadsDir = path.join(rootDir, 'downloads');
 const usersFile = path.join(rootDir, 'users.json');
+const menuImages = {
+  main: path.join(rootDir, 'assets', 'menu-images', 'main-menu.jpg'),
+  convert: path.join(rootDir, 'assets', 'menu-images', 'convert-menu.jpg'),
+  download: path.join(rootDir, 'assets', 'menu-images', 'video-platform-menu.jpg'),
+  musicDownload: path.join(rootDir, 'assets', 'menu-images', 'music-platform-menu.jpg')
+};
 
 const bot = new Telegraf(token);
 const userState = loadUserStore();
@@ -742,17 +748,35 @@ async function deleteMessageSafe(ctx, message) {
   await ctx.telegram.deleteMessage(ctx.chat.id, message.message_id).catch(() => {});
 }
 
-async function showMainMenu(ctx, edit = false) {
-  setMode(ctx.from.id, 'menu');
-  const text = t(ctx, 'mainMenu');
-  const keyboard = mainMenuKeyboard(ctx);
+function getCallbackMessage(ctx) {
+  return ctx.callbackQuery?.message;
+}
 
-  if (edit) {
-    await ctx.editMessageText(text, keyboard).catch(() => ctx.reply(text, keyboard));
+async function sendPhotoMenu(ctx, imagePath, caption, keyboard) {
+  if (!fs.existsSync(imagePath)) {
+    await ctx.reply(caption, keyboard);
     return;
   }
 
-  await ctx.reply(text, keyboard);
+  await ctx.replyWithPhoto(
+    { source: imagePath },
+    { caption, ...keyboard }
+  );
+}
+
+async function showPhotoMenu(ctx, imagePath, caption, keyboard, replace = false) {
+  if (replace) {
+    await deleteMessageSafe(ctx, getCallbackMessage(ctx));
+  }
+
+  await sendPhotoMenu(ctx, imagePath, caption, keyboard);
+}
+
+async function showMainMenu(ctx, replace = false) {
+  setMode(ctx.from.id, 'menu');
+  const text = t(ctx, 'mainMenu');
+  const keyboard = mainMenuKeyboard(ctx);
+  await showPhotoMenu(ctx, menuImages.main, text, keyboard, replace);
 }
 
 async function downloadTelegramFile(ctx, telegramFile, fallbackExtension) {
@@ -944,21 +968,21 @@ bot.action('push:send', async (ctx) => {
 bot.action('menu:convert', async (ctx) => {
   setMode(ctx.from.id, 'convert');
   await ctx.answerCbQuery();
-  await ctx.editMessageText(t(ctx, 'convertMenu'), convertKeyboard(ctx));
+  await showPhotoMenu(ctx, menuImages.convert, t(ctx, 'convertMenu'), convertKeyboard(ctx), true);
 });
 
 bot.action('menu:download', async (ctx) => {
   setMode(ctx.from.id, 'download');
   clearPendingDownload(ctx.from.id);
   await ctx.answerCbQuery();
-  await ctx.editMessageText(t(ctx, 'downloadMenu'), platformKeyboard(ctx));
+  await showPhotoMenu(ctx, menuImages.download, t(ctx, 'downloadMenu'), platformKeyboard(ctx), true);
 });
 
 bot.action('menu:download_music', async (ctx) => {
   setMode(ctx.from.id, 'music_download');
   clearPendingDownload(ctx.from.id);
   await ctx.answerCbQuery();
-  await ctx.editMessageText(t(ctx, 'musicDownloadMenu'), musicPlatformKeyboard(ctx));
+  await showPhotoMenu(ctx, menuImages.musicDownload, t(ctx, 'musicDownloadMenu'), musicPlatformKeyboard(ctx), true);
 });
 
 bot.action('menu:back', async (ctx) => {
@@ -973,7 +997,8 @@ bot.action(/^platform:(instagram|youtube|tiktok|vk|rutube)$/, async (ctx) => {
   setMode(ctx.from.id, 'download_url');
   setPendingDownload(ctx.from.id, { platform: platformId, url: undefined });
   await ctx.answerCbQuery(platform.label);
-  await ctx.editMessageText(
+  await deleteMessageSafe(ctx, getCallbackMessage(ctx));
+  await ctx.reply(
     t(ctx, 'platformChosen', { platform: platform.label }),
     backKeyboard(ctx)
   );
@@ -985,7 +1010,8 @@ bot.action(/^music_platform:(yandex_music|vk_music|youtube_music|spotify|soundcl
   setMode(ctx.from.id, 'music_url');
   setPendingDownload(ctx.from.id, { platform: platformId, url: undefined });
   await ctx.answerCbQuery(platform.label);
-  await ctx.editMessageText(
+  await deleteMessageSafe(ctx, getCallbackMessage(ctx));
+  await ctx.reply(
     t(ctx, 'musicPlatformChosen', { platform: platform.label }),
     backKeyboard(ctx)
   );
@@ -994,13 +1020,15 @@ bot.action(/^music_platform:(yandex_music|vk_music|youtube_music|spotify|soundcl
 bot.action('convert:mp4_to_mp3', async (ctx) => {
   setMode(ctx.from.id, 'convert_mp4_to_mp3');
   await ctx.answerCbQuery('MP4 в MP3');
-  await ctx.editMessageText(t(ctx, 'sendMp4'), backKeyboard(ctx));
+  await deleteMessageSafe(ctx, getCallbackMessage(ctx));
+  await ctx.reply(t(ctx, 'sendMp4'), backKeyboard(ctx));
 });
 
 bot.action('convert:mp3_to_mp4', async (ctx) => {
   setMode(ctx.from.id, 'convert_mp3_to_mp4');
   await ctx.answerCbQuery('MP3 в MP4');
-  await ctx.editMessageText(t(ctx, 'sendMp3'), backKeyboard(ctx));
+  await deleteMessageSafe(ctx, getCallbackMessage(ctx));
+  await ctx.reply(t(ctx, 'sendMp3'), backKeyboard(ctx));
 });
 
 bot.action(/^quality:(144|240|360|480|720|1080|1440|2160)$/, async (ctx) => {
