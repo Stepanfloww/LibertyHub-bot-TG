@@ -49,46 +49,46 @@ const maxInputBytes = Number(process.env.MAX_INPUT_MB || 45) * 1024 * 1024;
 
 const platforms = {
   instagram: {
-    label: 'Instagram',
+    label: '📸 Instagram',
     hosts: ['instagram.com']
   },
   youtube: {
-    label: 'YouTube',
+    label: '▶️ YouTube',
     hosts: ['youtube.com', 'youtu.be', 'm.youtube.com']
   },
   tiktok: {
-    label: 'TikTok',
+    label: '🎵 TikTok',
     hosts: ['tiktok.com', 'vm.tiktok.com', 'vt.tiktok.com']
   },
   vk: {
-    label: 'VK Video',
+    label: '🔵 VK Video',
     hosts: ['vk.com', 'm.vk.com', 'video.vk.com', 'vkvideo.ru', 'vk.ru']
   },
   rutube: {
-    label: 'Rutube',
+    label: '📺 Rutube',
     hosts: ['rutube.ru']
   }
 };
 
 const musicPlatforms = {
   yandex_music: {
-    label: 'Yandex Music',
+    label: '🟡 Yandex Music',
     hosts: ['music.yandex.ru']
   },
   vk_music: {
-    label: 'VK Music',
+    label: '🎧 VK Music',
     hosts: ['vk.com', 'm.vk.com', 'vk.ru']
   },
   youtube_music: {
-    label: 'YouTube Music',
+    label: '▶️ YouTube Music',
     hosts: ['music.youtube.com', 'youtube.com', 'youtu.be', 'm.youtube.com']
   },
   spotify: {
-    label: 'Spotify',
+    label: '🟢 Spotify',
     hosts: ['open.spotify.com', 'spotify.com']
   },
   soundcloud: {
-    label: 'SoundCloud',
+    label: '☁️ SoundCloud',
     hosts: ['soundcloud.com', 'm.soundcloud.com']
   }
 };
