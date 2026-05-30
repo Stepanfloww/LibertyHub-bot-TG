@@ -477,6 +477,10 @@ async function requireTool(ctx, command) {
 }
 
 function resolveToolPath(command) {
+  const localTool = process.platform === 'win32'
+    ? path.join(rootDir, 'tools', `${command}.exe`)
+    : path.join(rootDir, 'tools', command);
+  if (fs.existsSync(localTool)) return localTool;
   if (command === 'ffmpeg' && ffmpegPath) return ffmpegPath;
   if (command === 'ffprobe' && ffprobePath) return ffprobePath;
   return command;
@@ -485,7 +489,9 @@ function resolveToolPath(command) {
 async function downloadUrl(url, destination) {
   const client = url.startsWith('https:') ? https : http;
   await new Promise((resolve, reject) => {
-    const request = client.get(url, (response) => {
+    const request = client.get(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    }, (response) => {
       if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
         response.resume();
         downloadUrl(response.headers.location, destination).then(resolve, reject);
@@ -505,6 +511,49 @@ async function downloadUrl(url, destination) {
     });
 
     request.on('error', reject);
+  });
+}
+
+async function postFormJson(url, form) {
+  const body = new URLSearchParams(form).toString();
+  const parsedUrl = new URL(url);
+  const client = parsedUrl.protocol === 'https:' ? https : http;
+
+  return new Promise((resolve, reject) => {
+    const request = client.request({
+      method: 'POST',
+      hostname: parsedUrl.hostname,
+      path: `${parsedUrl.pathname}${parsedUrl.search}`,
+      port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(body),
+        'User-Agent': 'Mozilla/5.0'
+      }
+    }, (response) => {
+      let data = '';
+
+      response.setEncoding('utf8');
+      response.on('data', (chunk) => {
+        data += chunk;
+      });
+      response.on('end', () => {
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          reject(new Error(`POST ${url} failed with status ${response.statusCode}`));
+          return;
+        }
+
+        try {
+          resolve(JSON.parse(data));
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+
+    request.on('error', reject);
+    request.write(body);
+    request.end();
   });
 }
 
@@ -586,6 +635,9 @@ function buildBestVideoFormatSelector() {
 
 async function downloadSocialVideo(url, outputTemplate, quality) {
   const args = [
+    '--socket-timeout', '60',
+    '--retries', '5',
+    '--fragment-retries', '5',
     '--no-playlist',
     '--merge-output-format', 'mp4',
     '--recode-video', 'mp4',
@@ -595,6 +647,19 @@ async function downloadSocialVideo(url, outputTemplate, quality) {
   ];
 
   await runProcess('yt-dlp', args);
+}
+
+async function downloadTikTokViaTikwm(url, destination) {
+  const response = await postFormJson('https://www.tikwm.com/api/', {
+    url,
+    hd: '1'
+  });
+  const videoUrl = response?.data?.hdplay || response?.data?.play || response?.data?.wmplay;
+  if (response?.code !== 0 || !videoUrl) {
+    throw new Error(`TikWM did not return a video URL: ${response?.msg || 'unknown error'}`);
+  }
+
+  await downloadUrl(videoUrl, destination);
 }
 
 async function downloadMusicAudio(url, outputTemplate) {
@@ -766,9 +831,16 @@ async function handleVideoDownload(ctx, pending, quality = null) {
     statusMessage = await ctx.reply(
       quality ? t(ctx, 'qualityChosen', { quality: quality.label }) : t(ctx, 'downloadingVideo')
     );
-    await downloadSocialVideo(pending.url, outputTemplate, quality);
+    try {
+      await downloadSocialVideo(pending.url, outputTemplate, quality);
+    } catch (error) {
+      if (pending.platform !== 'tiktok') throw error;
+      console.error('yt-dlp TikTok download failed, trying TikWM fallback:', error.message || error);
+      downloaded = path.join(downloadsDir, `${id}.mp4`);
+      await downloadTikTokViaTikwm(pending.url, downloaded);
+    }
     const files = await fsp.readdir(downloadsDir);
-    downloaded = files
+    downloaded ||= files
       .filter((file) => file.startsWith(id))
       .map((file) => path.join(downloadsDir, file))[0];
 
