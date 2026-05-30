@@ -45,7 +45,7 @@ const bot = new Telegraf(token);
 const userState = loadUserStore();
 const pushDrafts = new Map();
 const maxOutputBytes = Number(process.env.MAX_OUTPUT_MB || 45) * 1024 * 1024;
-const maxInputBytes = Number(process.env.MAX_INPUT_MB || 20) * 1024 * 1024;
+const maxInputBytes = Number(process.env.MAX_INPUT_MB || 45) * 1024 * 1024;
 
 const platforms = {
   instagram: {
@@ -104,12 +104,14 @@ const qualities = [
   { id: '2160', label: '4K', height: 2160 }
 ];
 
+const qualityChoicePlatforms = new Set(['youtube', 'rutube', 'vk']);
+
 const messages = {
   start: 'Привет! Выберите действие кнопкой ниже.',
   help: 'Простите, но мы вам не поможем 🤗',
   downloadingFile: 'Скачиваю файл 🔗',
   converting: 'Конвертирую в {format}...',
-  converted: 'Готово: {file}',
+  converted: 'Готово',
   downloadingVideo: 'Скачиваю видео 🔗',
   unsupportedLink: 'Поддерживаются ссылки Instagram, YouTube, TikTok, VK Video и Rutube.',
   sendMp3: 'Отправьте 🎵 MP3-файл для конвертации в MP4 📷',
@@ -138,7 +140,7 @@ const messages = {
 Object.assign(messages, {
   musicDownloadMenu: 'Выберите звуковой сервис:',
   musicPlatformChosen: 'Пришлите ссылку {platform}. Бот скачает аудио в MP3, если сервис и ссылка поддерживаются yt-dlp.',
-  unsupportedMusicLink: 'Поддерживаются ссылки Yandex Music, VK Music, YouTube Music, Spotify и SoundCloud. Для некоторых сервисов могут понадобиться cookies или аккаунт.',
+  unsupportedMusicLink: 'Напишите /start',
   downloadingAudio: 'Скачиваю аудио и конвертирую в MP3...',
   downloadAudioButton: 'Скачать с звуковых сервисов'
 });
@@ -573,15 +575,26 @@ function buildFormatSelector(height) {
   return video.join('/');
 }
 
+function buildBestVideoFormatSelector() {
+  return [
+    'bv*[ext=mp4]+ba[ext=m4a]',
+    'bv*+ba',
+    'b[ext=mp4]',
+    'b'
+  ].join('/');
+}
+
 async function downloadSocialVideo(url, outputTemplate, quality) {
-  await runProcess('yt-dlp', [
+  const args = [
     '--no-playlist',
     '--merge-output-format', 'mp4',
     '--recode-video', 'mp4',
-    '-f', buildFormatSelector(quality.height),
+    '-f', quality ? buildFormatSelector(quality.height) : buildBestVideoFormatSelector(),
     '-o', outputTemplate,
     url
-  ]);
+  ];
+
+  await runProcess('yt-dlp', args);
 }
 
 async function downloadMusicAudio(url, outputTemplate) {
@@ -593,6 +606,17 @@ async function downloadMusicAudio(url, outputTemplate) {
     '--embed-metadata',
     '-o', outputTemplate,
     url
+  ]);
+}
+
+async function downloadSpotifyAudio(url, outputTemplate) {
+  await runProcess('spotdl', [
+    'download',
+    url,
+    '--format', 'mp3',
+    '--output', outputTemplate,
+    '--overwrite', 'force',
+    '--ffmpeg', resolveToolPath('ffmpeg')
   ]);
 }
 
@@ -708,7 +732,7 @@ async function sendDownloadedVideo(ctx, filePath, quality, statusMessage) {
     ).catch(() => {});
 
     compressedPath = path.join(downloadsDir, `${Date.now()}-${crypto.randomUUID()}-compressed.mp4`);
-    await compressVideoToLimit(filePath, compressedPath, maxOutputBytes, quality.height);
+    await compressVideoToLimit(filePath, compressedPath, maxOutputBytes, quality?.height || 1080);
 
     if (!(await assertSendable(ctx, compressedPath))) {
       await cleanup([compressedPath]);
@@ -721,10 +745,45 @@ async function sendDownloadedVideo(ctx, filePath, quality, statusMessage) {
   try {
     await ctx.replyWithVideo(
       { source: sendPath },
-      { caption: `${quality.label} - ${path.basename(sendPath)}` }
+      { caption: 'Готово' }
     );
   } finally {
     await cleanup([compressedPath]);
+  }
+}
+
+async function handleVideoDownload(ctx, pending, quality = null) {
+  if (!(await requireTool(ctx, 'yt-dlp'))) return;
+
+  await ensureDirs();
+
+  const id = `${Date.now()}-${crypto.randomUUID()}`;
+  const outputTemplate = path.join(downloadsDir, `${id}.%(ext)s`);
+  let statusMessage;
+  let downloaded;
+
+  try {
+    statusMessage = await ctx.reply(
+      quality ? t(ctx, 'qualityChosen', { quality: quality.label }) : t(ctx, 'downloadingVideo')
+    );
+    await downloadSocialVideo(pending.url, outputTemplate, quality);
+    const files = await fsp.readdir(downloadsDir);
+    downloaded = files
+      .filter((file) => file.startsWith(id))
+      .map((file) => path.join(downloadsDir, file))[0];
+
+    if (!downloaded) throw new Error('yt-dlp did not create an output file.');
+
+    await sendDownloadedVideo(ctx, downloaded, quality, statusMessage);
+    await deleteMessageSafe(ctx, statusMessage);
+    clearPendingDownload(ctx.from.id);
+    setMode(ctx.from.id, 'download');
+  } catch (error) {
+    console.error(error);
+    await ctx.reply(t(ctx, 'failed'));
+  } finally {
+    await deleteMessageSafe(ctx, statusMessage);
+    await cleanup([downloaded]);
   }
 }
 
@@ -738,7 +797,7 @@ bot.start(async (ctx) => {
 });
 
 bot.help(async (ctx) => {
-  await ctx.reply(t(ctx, 'help'), mainMenuKeyboard(ctx));
+  await ctx.reply(t(ctx, 'help'));
 });
 
 bot.command('push', async (ctx) => {
@@ -882,36 +941,7 @@ bot.action(/^quality:(144|240|360|480|720|1080|1440|2160)$/, async (ctx) => {
   }
 
   await ctx.answerCbQuery(quality.label);
-  if (!(await requireTool(ctx, 'yt-dlp'))) return;
-
-  await ensureDirs();
-
-  const id = `${Date.now()}-${crypto.randomUUID()}`;
-  const outputTemplate = path.join(downloadsDir, `${id}.%(ext)s`);
-  let statusMessage;
-  let downloaded;
-
-  try {
-    statusMessage = await ctx.reply(t(ctx, 'qualityChosen', { quality: quality.label }));
-    await downloadSocialVideo(pending.url, outputTemplate, quality);
-    const files = await fsp.readdir(downloadsDir);
-    downloaded = files
-      .filter((file) => file.startsWith(id))
-      .map((file) => path.join(downloadsDir, file))[0];
-
-    if (!downloaded) throw new Error('yt-dlp did not create an output file.');
-
-    await sendDownloadedVideo(ctx, downloaded, quality, statusMessage);
-    await deleteMessageSafe(ctx, statusMessage);
-    clearPendingDownload(ctx.from.id);
-    setMode(ctx.from.id, 'download');
-  } catch (error) {
-    console.error(error);
-    await ctx.reply(t(ctx, 'failed'));
-  } finally {
-    await deleteMessageSafe(ctx, statusMessage);
-    await cleanup([downloaded]);
-  }
+  await handleVideoDownload(ctx, pending, quality);
 });
 
 bot.on('photo', async (ctx) => {
@@ -1034,18 +1064,28 @@ bot.on('text', async (ctx) => {
       return;
     }
 
-    if (!(await requireTool(ctx, 'yt-dlp')) || !(await requireTool(ctx, 'ffmpeg'))) return;
+    if (pending.platform === 'spotify') {
+      if (!(await requireTool(ctx, 'spotdl')) || !(await requireTool(ctx, 'ffmpeg'))) return;
+    } else if (!(await requireTool(ctx, 'yt-dlp')) || !(await requireTool(ctx, 'ffmpeg'))) {
+      return;
+    }
 
     await ensureDirs();
 
     const id = `${Date.now()}-${crypto.randomUUID()}`;
-    const outputTemplate = path.join(downloadsDir, `${id}.%(ext)s`);
+    const outputTemplate = pending.platform === 'spotify'
+      ? path.join(downloadsDir, `${id}.{output-ext}`)
+      : path.join(downloadsDir, `${id}.%(ext)s`);
     let statusMessage;
     let downloaded;
 
     try {
       statusMessage = await ctx.reply(t(ctx, 'downloadingAudio'));
-      await downloadMusicAudio(text, outputTemplate);
+      if (pending.platform === 'spotify') {
+        await downloadSpotifyAudio(text, outputTemplate);
+      } else {
+        await downloadMusicAudio(text, outputTemplate);
+      }
       const files = await fsp.readdir(downloadsDir);
       downloaded = files
         .filter((file) => file.startsWith(id))
@@ -1056,7 +1096,7 @@ bot.on('text', async (ctx) => {
       if (await assertSendable(ctx, downloaded)) {
         await ctx.replyWithAudio(
           { source: downloaded },
-          { caption: `${musicPlatforms[pending.platform].label} - ${path.basename(downloaded)}` }
+          { caption: 'Готово' }
         );
       }
 
@@ -1094,7 +1134,13 @@ bot.on('text', async (ctx) => {
   }
 
   setPendingDownload(ctx.from.id, { url: text });
-  await ctx.reply(t(ctx, 'chooseQuality'), qualityKeyboard(ctx));
+  const download = getPendingDownload(ctx.from.id);
+  if (qualityChoicePlatforms.has(download.platform)) {
+    await ctx.reply(t(ctx, 'chooseQuality'), qualityKeyboard(ctx));
+    return;
+  }
+
+  await handleVideoDownload(ctx, download);
 });
 
 bot.catch((error, ctx) => {
