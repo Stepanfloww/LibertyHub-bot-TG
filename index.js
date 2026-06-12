@@ -50,8 +50,14 @@ const menuImages = {
 const bot = new Telegraf(token);
 const userState = loadUserStore();
 const pushDrafts = new Map();
-const maxOutputBytes = Number(process.env.MAX_OUTPUT_MB || 45) * 1024 * 1024;
+const renameFiles = new Map();
+const maxOutputBytes = Number(process.env.MAX_OUTPUT_MB || 1900) * 1024 * 1024;
+const compressedOutputBytes = Number(process.env.COMPRESSED_OUTPUT_MB || 45) * 1024 * 1024;
 const maxInputBytes = Number(process.env.MAX_INPUT_MB || 45) * 1024 * 1024;
+const downloadFragmentConcurrency = String(process.env.YTDLP_CONCURRENT_FRAGMENTS || 12);
+const downloadChunkSize = String(process.env.YTDLP_HTTP_CHUNK_SIZE || '10M');
+const sendVideoAsDocument = process.env.SEND_VIDEO_AS_DOCUMENT !== '0';
+const renameCacheTtlMs = Number(process.env.RENAME_CACHE_MINUTES || 30) * 60 * 1000;
 
 const platforms = {
   instagram: {
@@ -149,6 +155,14 @@ Object.assign(messages, {
   unsupportedMusicLink: 'Напишите /start',
   downloadingAudio: 'Скачиваю аудио и конвертирую в MP3...',
   downloadAudioButton: '⏪ Скачать со звуковых платформ ⏩'
+});
+
+Object.assign(messages, {
+  renameFileButton: '\u270f\ufe0f \u0418\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0444\u0430\u0439\u043b\u0430',
+  askRenameFile: '\u041f\u0440\u0438\u0448\u043b\u0438\u0442\u0435 \u043d\u043e\u0432\u043e\u0435 \u0438\u043c\u044f \u0444\u0430\u0439\u043b\u0430 \u0442\u0435\u043a\u0441\u0442\u043e\u043c.',
+  renameMissing: '\u0424\u0430\u0439\u043b \u0434\u043b\u044f \u043f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u0438\u044f \u0443\u0436\u0435 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d. \u041e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 \u0438\u043b\u0438 \u0441\u043a\u0430\u0447\u0430\u0439\u0442\u0435 \u0444\u0430\u0439\u043b \u0435\u0449\u0435 \u0440\u0430\u0437.',
+  renameInvalid: '\u0418\u043c\u044f \u0444\u0430\u0439\u043b\u0430 \u043d\u0435 \u043f\u043e\u0434\u043e\u0448\u043b\u043e. \u041f\u0440\u0438\u0448\u043b\u0438\u0442\u0435 \u0438\u043c\u044f \u0431\u0435\u0437 / \\ : * ? " < > |.',
+  renamedDone: '\u0413\u043e\u0442\u043e\u0432\u043e'
 });
 
 function loadEnv() {
@@ -457,6 +471,94 @@ function getFileExtension(name, fallback) {
   return extension || fallback;
 }
 
+function renameFileKeyboard(ctx) {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback(t(ctx, 'renameFileButton'), 'file:rename')]
+  ]);
+}
+
+function getRenameFile(userId) {
+  return renameFiles.get(userKey(userId));
+}
+
+async function clearRenameFile(userId) {
+  const key = userKey(userId);
+  const remembered = renameFiles.get(key);
+  renameFiles.delete(key);
+  await cleanup([remembered?.filePath]);
+}
+
+function scheduleRenameCleanup(userId, filePath) {
+  setTimeout(() => {
+    const remembered = getRenameFile(userId);
+    if (remembered?.filePath !== filePath) return;
+    clearRenameFile(userId).catch(() => {});
+  }, renameCacheTtlMs).unref?.();
+}
+
+async function rememberRenameFile(ctx, filePath) {
+  await ensureDirs();
+
+  const key = userKey(ctx.from.id);
+  const previous = renameFiles.get(key);
+  const extension = path.extname(filePath) || '.file';
+  const cachedPath = path.join(tmpDir, `${Date.now()}-${crypto.randomUUID()}${extension}`);
+
+  await fsp.copyFile(filePath, cachedPath);
+  if (previous?.filePath && previous.filePath !== cachedPath) {
+    await cleanup([previous.filePath]);
+  }
+
+  renameFiles.set(key, {
+    filePath: cachedPath,
+    originalName: path.basename(filePath),
+    returnMode: getMode(ctx.from.id)
+  });
+  scheduleRenameCleanup(ctx.from.id, cachedPath);
+}
+
+function sanitizeFileName(name) {
+  return name
+    .trim()
+    .replace(/[\\/:*?"<>|\r\n\t]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/[. ]+$/g, '')
+    .slice(0, 120)
+    .trim();
+}
+
+function buildRenamedFileName(text, originalName) {
+  const cleanName = sanitizeFileName(text);
+  if (!cleanName) return null;
+
+  const originalExtension = path.extname(originalName || '');
+  if (path.extname(cleanName)) return cleanName;
+  return `${cleanName}${originalExtension}`;
+}
+
+async function sendRenamedFile(ctx, text) {
+  const remembered = getRenameFile(ctx.from.id);
+  if (!remembered || !fs.existsSync(remembered.filePath)) {
+    setMode(ctx.from.id, 'menu');
+    await clearRenameFile(ctx.from.id);
+    await ctx.reply(t(ctx, 'renameMissing'), mainMenuKeyboard(ctx));
+    return;
+  }
+
+  const fileName = buildRenamedFileName(text, remembered.originalName);
+  if (!fileName) {
+    await ctx.reply(t(ctx, 'renameInvalid'));
+    return;
+  }
+
+  await ctx.replyWithDocument(
+    { source: remembered.filePath, filename: fileName },
+    { caption: t(ctx, 'renamedDone') }
+  );
+  setMode(ctx.from.id, remembered.returnMode || 'menu');
+  await clearRenameFile(ctx.from.id);
+}
+
 async function ensureDirs() {
   await fsp.mkdir(tmpDir, { recursive: true });
   await fsp.mkdir(downloadsDir, { recursive: true });
@@ -490,6 +592,10 @@ function resolveToolPath(command) {
   if (command === 'ffmpeg' && ffmpegPath) return ffmpegPath;
   if (command === 'ffprobe' && ffprobePath) return ffprobePath;
   return command;
+}
+
+function ytDlpFfmpegArgs() {
+  return ['--ffmpeg-location', resolveToolPath('ffmpeg')];
 }
 
 async function downloadUrl(url, destination) {
@@ -593,14 +699,16 @@ async function convertMp3ToMp4(input, output) {
   await runProcess('ffmpeg', [
     '-y',
     '-f', 'lavfi',
-    '-i', 'color=c=0x111827:s=1280x720:r=30',
+    '-i', 'color=c=0x111827:s=1280x720:r=1',
     '-i', input,
     '-shortest',
     '-c:v', 'libx264',
-    '-preset', 'veryfast',
+    '-preset', 'ultrafast',
     '-tune', 'stillimage',
+    '-crf', '28',
     '-c:a', 'aac',
     '-b:a', '192k',
+    '-movflags', '+faststart',
     '-pix_fmt', 'yuv420p',
     output
   ]);
@@ -610,6 +718,7 @@ async function convertMp4ToMp3(input, output) {
   await runProcess('ffmpeg', [
     '-y',
     '-i', input,
+    '-map', '0:a:0',
     '-vn',
     '-c:a', 'libmp3lame',
     '-b:a', '192k',
@@ -618,35 +727,69 @@ async function convertMp4ToMp3(input, output) {
 }
 
 function buildFormatSelector(height) {
-  const video = [
-    `bv*[height<=${height}][ext=mp4]+ba[ext=m4a]`,
-    `bv*[height<=${height}]+ba`,
-    `b[height<=${height}][ext=mp4]`,
-    `b[height<=${height}]`,
-    'worst[ext=mp4]',
-    'worst'
-  ];
-
-  return video.join('/');
+  return [
+    `bv*[height<=${height}]+ba/b[height<=${height}]`,
+    `bv*[height<=${height}][ext=mp4]+ba[ext=m4a]/b[height<=${height}][ext=mp4]`,
+    'bv*+ba/b'
+  ].join('/');
 }
 
 function buildBestVideoFormatSelector() {
   return [
-    'bv*[ext=mp4]+ba[ext=m4a]',
     'bv*+ba',
+    'bv*[ext=mp4]+ba[ext=m4a]',
     'b[ext=mp4]',
     'b'
   ].join('/');
 }
 
+function isPartialDownload(fileName) {
+  return [
+    '.part',
+    '.ytdl',
+    '.temp',
+    '.tmp'
+  ].some((suffix) => fileName.endsWith(suffix));
+}
+
+function isVideoFile(fileName) {
+  return ['.mp4', '.m4v', '.mov', '.mkv', '.webm'].includes(path.extname(fileName).toLowerCase());
+}
+
+async function getDownloadArtifacts(id) {
+  const files = await fsp.readdir(downloadsDir);
+  return files
+    .filter((file) => file.startsWith(id))
+    .map((file) => path.join(downloadsDir, file));
+}
+
+function pickDownloadedVideo(id, artifacts) {
+  const completedVideos = artifacts
+    .filter((filePath) => !isPartialDownload(path.basename(filePath)))
+    .filter((filePath) => isVideoFile(filePath));
+
+  return (
+    completedVideos.find((filePath) => path.basename(filePath) === `${id}.mp4`) ||
+    completedVideos.find((filePath) => path.extname(filePath).toLowerCase() === '.mp4') ||
+    completedVideos[0]
+  );
+}
+
 async function downloadSocialVideo(url, outputTemplate, quality) {
   const args = [
     '--socket-timeout', '60',
-    '--retries', '5',
-    '--fragment-retries', '5',
+    '--retries', '10',
+    '--fragment-retries', '10',
+    '--file-access-retries', '5',
+    '--extractor-retries', '3',
+    '--concurrent-fragments', downloadFragmentConcurrency,
+    '--http-chunk-size', downloadChunkSize,
     '--no-playlist',
+    '--no-mtime',
+    '--force-overwrites',
     '--merge-output-format', 'mp4',
-    '--recode-video', 'mp4',
+    '--remux-video', 'mp4',
+    ...ytDlpFfmpegArgs(),
     '-f', quality ? buildFormatSelector(quality.height) : buildBestVideoFormatSelector(),
     '-o', outputTemplate,
     url
@@ -791,8 +934,13 @@ async function downloadTelegramFile(ctx, telegramFile, fallbackExtension) {
 }
 
 async function sendConvertedFile(ctx, filePath, format) {
+  await rememberRenameFile(ctx, filePath);
+
   const payload = { source: filePath };
-  const options = { caption: t(ctx, 'converted', { file: path.basename(filePath) }) };
+  const options = {
+    caption: t(ctx, 'converted', { file: path.basename(filePath) }),
+    ...renameFileKeyboard(ctx)
+  };
   if (format === 'mp4') {
     await ctx.replyWithVideo(payload, options);
   } else if (format === 'mp3') {
@@ -821,7 +969,7 @@ async function sendDownloadedVideo(ctx, filePath, quality, statusMessage) {
     ).catch(() => {});
 
     compressedPath = path.join(downloadsDir, `${Date.now()}-${crypto.randomUUID()}-compressed.mp4`);
-    await compressVideoToLimit(filePath, compressedPath, maxOutputBytes, quality?.height || 1080);
+    await compressVideoToLimit(filePath, compressedPath, compressedOutputBytes, quality?.height || 2160);
 
     if (!(await assertSendable(ctx, compressedPath))) {
       await cleanup([compressedPath]);
@@ -831,18 +979,50 @@ async function sendDownloadedVideo(ctx, filePath, quality, statusMessage) {
     sendPath = compressedPath;
   }
 
+  const sendFile = async (filePathToSend) => {
+    await rememberRenameFile(ctx, filePathToSend);
+
+    if (sendVideoAsDocument) {
+      await ctx.replyWithDocument(
+        { source: filePathToSend },
+        { caption: 'Готово' }
+      );
+    } else {
+      await ctx.replyWithVideo(
+        { source: filePathToSend },
+        { caption: 'Готово', supports_streaming: true }
+      );
+    }
+  };
+
   try {
-    await ctx.replyWithVideo(
-      { source: sendPath },
-      { caption: 'Готово' }
-    );
+    await sendFile(sendPath);
+    await ctx.reply(t(ctx, 'renameFileButton'), renameFileKeyboard(ctx));
+  } catch (error) {
+    if (compressedPath || stats.size <= compressedOutputBytes) throw error;
+    if (!(await requireTool(ctx, 'ffmpeg')) || !(await requireTool(ctx, 'ffprobe'))) throw error;
+
+    await ctx.telegram.editMessageText(
+      ctx.chat.id,
+      statusMessage.message_id,
+      undefined,
+      t(ctx, 'compressingVideo')
+    ).catch(() => {});
+
+    compressedPath = path.join(downloadsDir, `${Date.now()}-${crypto.randomUUID()}-compressed.mp4`);
+    await compressVideoToLimit(filePath, compressedPath, compressedOutputBytes, quality?.height || 2160);
+
+    if (await assertSendable(ctx, compressedPath)) {
+      await sendFile(compressedPath);
+      await ctx.reply(t(ctx, 'renameFileButton'), renameFileKeyboard(ctx));
+    }
   } finally {
     await cleanup([compressedPath]);
   }
 }
 
 async function handleVideoDownload(ctx, pending, quality = null) {
-  if (!(await requireTool(ctx, 'yt-dlp'))) return;
+  if (!(await requireTool(ctx, 'yt-dlp')) || !(await requireTool(ctx, 'ffmpeg'))) return;
 
   await ensureDirs();
 
@@ -850,6 +1030,7 @@ async function handleVideoDownload(ctx, pending, quality = null) {
   const outputTemplate = path.join(downloadsDir, `${id}.%(ext)s`);
   let statusMessage;
   let downloaded;
+  let artifacts = [];
 
   try {
     statusMessage = await ctx.reply(
@@ -863,10 +1044,8 @@ async function handleVideoDownload(ctx, pending, quality = null) {
       downloaded = path.join(downloadsDir, `${id}.mp4`);
       await downloadTikTokViaTikwm(pending.url, downloaded);
     }
-    const files = await fsp.readdir(downloadsDir);
-    downloaded ||= files
-      .filter((file) => file.startsWith(id))
-      .map((file) => path.join(downloadsDir, file))[0];
+    artifacts = await getDownloadArtifacts(id);
+    downloaded ||= pickDownloadedVideo(id, artifacts);
 
     if (!downloaded) throw new Error('yt-dlp did not create an output file.');
 
@@ -879,7 +1058,8 @@ async function handleVideoDownload(ctx, pending, quality = null) {
     await ctx.reply(t(ctx, 'failed'));
   } finally {
     await deleteMessageSafe(ctx, statusMessage);
-    await cleanup([downloaded]);
+    if (!artifacts.length) artifacts = await getDownloadArtifacts(id).catch(() => []);
+    await cleanup([...new Set([...artifacts, downloaded].filter(Boolean))]);
   }
 }
 
@@ -1044,6 +1224,24 @@ bot.action(/^quality:(144|240|360|480|720|1080|1440|2160)$/, async (ctx) => {
   await handleVideoDownload(ctx, pending, quality);
 });
 
+bot.action('file:rename', async (ctx) => {
+  const remembered = getRenameFile(ctx.from.id);
+  if (!remembered || !fs.existsSync(remembered.filePath)) {
+    await clearRenameFile(ctx.from.id);
+    await ctx.answerCbQuery();
+    await ctx.reply(t(ctx, 'renameMissing'), mainMenuKeyboard(ctx));
+    return;
+  }
+
+  renameFiles.set(userKey(ctx.from.id), {
+    ...remembered,
+    returnMode: getMode(ctx.from.id)
+  });
+  setMode(ctx.from.id, 'rename_file');
+  await ctx.answerCbQuery();
+  await ctx.reply(t(ctx, 'askRenameFile'));
+});
+
 bot.on('photo', async (ctx) => {
   if (!isAdmin(ctx.from.id) || !getPushDraft(ctx.from.id)) {
     return;
@@ -1137,12 +1335,19 @@ bot.on('text', async (ctx) => {
   }
 
   const mode = getMode(ctx.from.id);
+  const text = ctx.message.text.trim();
+
+  if (mode === 'rename_file') {
+    if (text.startsWith('/')) return;
+    await sendRenamedFile(ctx, text);
+    return;
+  }
+
   if (!['download_url', 'music_url'].includes(mode)) {
     await ctx.reply(t(ctx, 'chooseFromMenu'), mainMenuKeyboard(ctx));
     return;
   }
 
-  const text = ctx.message.text.trim();
   if (mode === 'music_url') {
     const urlPlatform = getMusicPlatformFromUrl(text);
     if (!urlPlatform) {
@@ -1194,10 +1399,16 @@ bot.on('text', async (ctx) => {
       if (!downloaded) throw new Error('yt-dlp did not create an output audio file.');
 
       if (await assertSendable(ctx, downloaded)) {
+        await rememberRenameFile(ctx, downloaded);
         await ctx.replyWithAudio(
           { source: downloaded },
           { caption: 'Готово' }
         );
+      }
+
+      const rememberedAudio = getRenameFile(ctx.from.id);
+      if (rememberedAudio?.originalName === path.basename(downloaded)) {
+        await ctx.reply(t(ctx, 'renameFileButton'), renameFileKeyboard(ctx));
       }
 
       await deleteMessageSafe(ctx, statusMessage);
