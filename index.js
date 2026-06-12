@@ -114,7 +114,7 @@ const qualityChoicePlatforms = new Set(['youtube', 'rutube', 'vk']);
 
 const messages = {
   start: 'Привет! Выберите действие кнопкой ниже.',
-  help: 'Столкнулись с проблемами пишите: https://t.me/Stepanfw ',
+  help: 'Если у вас возникли вопросы по сотрудничеству или вы столкнулись с проблемой — пишите: https://t.me/Matllizers',
   downloadingFile: 'Скачиваю файл...',
   converting: 'Конвертирую в {format}...',
   converted: 'Готово!',
