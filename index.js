@@ -47,20 +47,6 @@ const menuImages = {
   musicDownload: path.join(rootDir, 'assets', 'menu-images', 'music-platform-menu.jpg')
 };
 
-// Change these values to the emoji/custom emoji text you want to show in buttons.
-// Telegram inline keyboard buttons can show text/emoji, but not sticker files directly.
-const buttonStickers = {
-  convertFiles: '🔁',
-  mp4ToMp3Left: '🎬',
-  mp4ToMp3Right: '🎵',
-  mp3ToMp4Left: '🎵',
-  mp3ToMp4Right: '🎬',
-  downloadVideo: '🔽',
-  downloadAudioLeft: '⏪',
-  downloadAudioRight: '⏩',
-  back: '◀️'
-};
-
 const bot = new Telegraf(token);
 const userState = loadUserStore();
 const pushDrafts = new Map();
@@ -155,11 +141,11 @@ const messages = {
   chooseQuality: 'Выберите качество:',
   qualityChosen: 'Скачиваю {quality}...',
   compressingVideo: 'Файл большой. Начинаю сжимать...',
-  convertFilesButton: `${buttonStickers.convertFiles} Конвертация файлов ${buttonStickers.convertFiles}`,
-  mp4ToMp3Button: `${buttonStickers.mp4ToMp3Left} MP4 в MP3 ${buttonStickers.mp4ToMp3Right}`,
-  mp3ToMp4Button: `${buttonStickers.mp3ToMp4Left} MP3 в MP4 ${buttonStickers.mp3ToMp4Right}`,
-  downloadVideoButton: `${buttonStickers.downloadVideo} Скачать видео ${buttonStickers.downloadVideo}`,
-  backButton: `${buttonStickers.back} Назад`,
+  convertFilesButton: "🔁 Конвертация файлов 🔁",
+  mp4ToMp3Button: "🎬 MP4 в MP3 🎵",
+  mp3ToMp4Button: '🎵 MP3 в MP4 🎬',
+  downloadVideoButton: "🔽 Скачать видео 🔽",
+  backButton: 'Назад',
   chooseFromMenu: 'Сначала выберите раздел в меню.',
   commands: 'Команды: /start, /help'
 };
@@ -168,7 +154,7 @@ Object.assign(messages, {
   musicPlatformChosen: 'Пришлите ссылку {platform}. Бот скачает аудио в MP3.',
   unsupportedMusicLink: 'Напишите /start',
   downloadingAudio: 'Скачиваю аудио и конвертирую в MP3...',
-  downloadAudioButton: `${buttonStickers.downloadAudioLeft} Скачать со звуковых платформ ${buttonStickers.downloadAudioRight}`
+  downloadAudioButton: '⏪ Скачать со звуковых платформ ⏩'
 });
 
 Object.assign(messages, {
